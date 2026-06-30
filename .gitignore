@@ -1,0 +1,43 @@
+# Environnements claude
+.claude/
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Environnements virtuels
+venv/
+env/
+.venv/
+ENV/
+
+# Variables d'environnement / secrets
+.env
+.env.local
+
+# Outils de test et couverture
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# IDE / éditeurs
+.vscode/
+.idea/
+
+# Fichiers spécifiques à l'OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
