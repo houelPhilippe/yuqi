@@ -1,0 +1,36 @@
+<svg width="100%" viewBox="0 0 680 260" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo MKStudio</title>
+  <desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Logo élégant MKStudio avec icône géométrique bleue et texte typographique</desc>
+
+  <defs>
+    <linearGradient id="gradBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="gradDeep" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icône : carré arrondi fond dégradé -->
+  <rect x="200" y="40" width="110" height="110" rx="22" fill="url(#gradDeep)" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Lettre M stylisée -->
+  <polyline points="222,130 222,70 257,108 292,70 292,130" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" style="fill:none;stroke:rgb(255, 255, 255);color:rgb(255, 255, 255);stroke-width:7px;stroke-linecap:round;stroke-linejoin:round;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Accent / soulignement sous l'icône -->
+  <rect x="200" y="158" width="110" height="4" rx="2" fill="url(#gradBlue)" opacity="0.7" style="stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.7;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Texte principal "MKStudio" -->
+  <text x="328" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" letter-spacing="1" fill="#0ea5e9" style="fill:rgb(14, 165, 233);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:Georgia, &quot;Times New Roman&quot;, serif;font-size:52px;font-weight:700;text-anchor:start;dominant-baseline:auto">MK</text>
+
+  <text x="328" y="148" font-family="'Segoe UI', Arial, sans-serif" font-size="26" font-weight="300" letter-spacing="8" fill="#38bdf8" style="fill:rgb(56, 189, 248);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Segoe UI&quot;, Arial, sans-serif;font-size:26px;font-weight:300;text-anchor:start;dominant-baseline:auto">STUDIO</text>
+
+  <!-- Ligne fine décorative à droite du texte -->
+  <line x1="328" y1="158" x2="530" y2="158" stroke="#0ea5e9" stroke-width="1" opacity="0.35" style="fill:rgb(0, 0, 0);stroke:rgb(14, 165, 233);color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.35;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- Tagline -->
+  <text x="328" y="184" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="400" letter-spacing="3" fill="#7dd3fc" opacity="0.85" style="fill:rgb(125, 211, 252);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:0.85;font-family:&quot;Segoe UI&quot;, Arial, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">MARKDOWN · QUARTO · PLANTUML</text>
+
+</svg>

@@ -1,0 +1,5 @@
+L2963: const data = await window.pywebview.api.open_file_by_path(item.path);
+L3000: async function openFile() {
+L3002: const result = await window.pywebview.api.open_file();
+L3967: if (ctrl && e.key === 'o') { e.preventDefault(); openFile(); }
+L3992: window.openFile = openFile;

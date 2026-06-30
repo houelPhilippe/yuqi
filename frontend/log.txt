@@ -1,0 +1,21 @@
+L102: text-align: right;
+L223: text-align: left;
+L233: text-align: center;
+L313: text-align: left;
+L715: text-align: center;
+L1006: #preview.justified p { text-align: justify; }
+L1378: text-align: right;
+L1685: #preview figure.fig-left   { text-align: left;   margin-right: auto; }
+L1686: #preview figure.fig-center { text-align: center; margin-left: auto; margin-right: auto; }
+L1687: #preview figure.fig-right  { text-align: right;  margin-left: auto; }
+L1825: text-align: center;
+L1833: text-align: left;
+L1835: #preview th[align="center"], #preview td[align="center"] { text-align: center; }
+L1836: #preview th[align="right"], #preview td[align="right"] { text-align: right; }
+L1837: #preview th[align="left"], #preview td[align="left"] { text-align: left; }
+L1839: text-align: inherit;
+L2012: text-align: right;
+L2225: text-align: right;
+L2338: text-align: right;
+L2450: text-align: left;
+L2485: text-align: left;

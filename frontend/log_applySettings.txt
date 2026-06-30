@@ -1,0 +1,10 @@
+L3087: document.getElementById('justify-enabled').checked  = s.justify  ?? true;
+L3111: function applySettings() {
+L3118: const justify      = document.getElementById('justify-enabled').checked;
+L3129: saveSettings({ projectDir, spellcheck: enabled, lang, zoomDefault, sidebarWidth, tocWidth, justify, editBar, lineHeight, fontText, fontTable, fontCode, fontYaml, fontSizeText, fontSizeTable, fontSizeCode, fontSizeYaml });
+L3135: preview.classList.toggle('justified', justify);
+L3168: function _applySettingsObj(s) {
+L3176: preview.classList.toggle('justified',   s.justify ?? true);
+L3193: _applySettingsObj(loadSettings());
+L3200: _applySettingsObj(fs);
+L4020: window.applySettings = applySettings;

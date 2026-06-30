@@ -1,0 +1,2 @@
+pywebview>=4.0
+pyspellchecker>=0.7

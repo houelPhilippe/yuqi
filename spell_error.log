@@ -1,0 +1,5 @@
+[spell] _get_spell_checker('fr') failed: No module named 'spellchecker'
+Traceback (most recent call last):
+  File "C:\DEV\_Perso\editeur_python\api.py", line 17, in _get_spell_checker
+    from spellchecker import SpellChecker
+ModuleNotFoundError: No module named 'spellchecker'

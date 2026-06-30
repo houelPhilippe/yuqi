@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="turndown.min.js"></script>
+</head>
+<body>
+  <div id="test"><td>------ texte</td></div>
+  <div id="test2"><td>- - - - - - - texte</td></div>
+  <script>
+    const t = new TurndownService({ bulletListMarker: '-' });
+    const res1 = t.turndown(document.getElementById('test').innerHTML);
+    const res2 = t.turndown(document.getElementById('test2').innerHTML);
+    const fs = require('fs'); // wait, this is browser, no fs
+  </script>
+</body>
+</html>

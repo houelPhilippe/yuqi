@@ -1,0 +1,2964 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Éditeur Markdown</title>
+
+  <!-- Stub défini AVANT app.js : pywebview peut appeler openInitialFile dès le chargement du DOM -->
+  <script>
+    window._pendingInitialFileData = null;
+    window.openInitialFile = function(data) {
+      window._pendingInitialFileData = data;
+    };
+  </script>
+
+  <!-- marked.js + Turndown (local — évite les problèmes de timing CDN) -->
+  <script src="marked.min.js"></script>
+  <script src="turndown.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Splash screen -->
+  <div id="splash-screen">
+    <div id="splash-content">
+      <img id="splash-image" src="splash-screen.jpeg" alt="YUQI">
+      <p id="splash-subtitle">Your Unofficial Quarto IDE</p>
+    </div>
+  </div>
+
+  <div id="app">
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <!-- Logo -->
+      <img id="toolbar-logo" src="logo.svg" alt="Logo" title="Éditeur Markdown">
+
+      <!-- Menu hamburger (contient toutes les actions) -->
+      <div id="menu-container">
+        <button id="menu-btn" onclick="toggleMenu()" title="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6"  x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div id="menu-dropdown">
+
+          <!-- Fichier -->
+          <button class="menu-item" onclick="openFile(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            Ouvrir <span class="menu-shortcut">Ctrl+O</span>
+          </button>
+          <button class="menu-item" onclick="saveFile(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            Enregistrer <span class="menu-shortcut">Ctrl+S</span>
+          </button>
+          <button class="menu-item" onclick="saveFileAs(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+              <line x1="20" y1="8" x2="20" y2="12"/><line x1="18" y1="10" x2="22" y2="10"/>
+            </svg>
+            Enregistrer sous…
+          </button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" onclick="closeCurrentTab(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Fermer <span class="menu-shortcut">Ctrl+W</span>
+          </button>
+
+          <!-- Mode source -->
+          <div class="menu-sep"></div>
+          <button class="menu-item source-toggle" onclick="const cb=document.getElementById('source-toggle-input'); cb.checked=!cb.checked; toggleSourceMode(cb.checked); closeMenu()" title="Basculer source / prévisualisation (Ctrl+Shift+M)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            Source MD
+            <span class="menu-shortcut">Ctrl+⇧+M</span>
+          </button>
+
+          <!-- Compilation projet -->
+          <div id="menu-compile-section">
+            <div class="menu-sep"></div>
+            <button class="menu-item" onclick="compileProject('html'); closeMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+              Compiler le Projet — HTML
+            </button>
+            <button class="menu-item" onclick="compileProject('pdf'); closeMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+              </svg>
+              Compiler le Projet — PDF
+            </button>
+            <button class="menu-item" onclick="compileProject('docx'); closeMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="11" y1="13" x2="19" y2="13"/><line x1="11" y1="17" x2="19" y2="17"/>
+              </svg>
+              Compiler le Projet — Word
+            </button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" onclick="openProjectHtml(); closeMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+              Voir Résultat — HTML
+            </button>
+            <button class="menu-item" onclick="openProjectPdf(); closeMenu()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/>
+              </svg>
+              Voir Résultat — PDF
+            </button>
+          </div>
+
+          <!-- Paramètres / Aide -->
+          <div class="menu-sep"></div>
+          <button class="menu-item" onclick="openSettings(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Paramètres du Projet
+          </button>
+          <button class="menu-item" onclick="openHelpDialog(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Aide / Raccourcis <span class="menu-shortcut">Échap×2</span>
+          </button>
+          <button class="menu-item" onclick="openReadme(); closeMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            README
+          </button>
+          <div class="menu-sep"></div>
+          <button class="menu-item menu-item-danger" onclick="quitApp()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Quitter
+          </button>
+        </div>
+      </div>
+
+      <!-- Zone des onglets (prend tout l'espace disponible) -->
+      <div id="tab-area">
+        <div id="tab-list"></div>
+        <!-- Bouton liste de tous les onglets -->
+        <button id="tabs-menu-btn" title="Tous les onglets ouverts" onclick="toggleTabsMenu()" style="display:none">
+          <span id="tabs-menu-label">…</span>
+        </button>
+        <button id="new-tab-btn" onclick="newTab()" title="Nouveau fichier">+</button>
+      </div>
+
+      <!-- Bouton réduire -->
+      <button class="toolbar-minimize-btn" onmousedown="event.preventDefault()" onclick="minimizeWindow()" title="Réduire">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+
+      <!-- Bouton plein écran (F11) -->
+      <button class="toolbar-fullscreen-btn" onmousedown="event.preventDefault()" onclick="toggleFullscreen()" title="Plein écran (F11)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 3 21 3 21 9"/>
+          <polyline points="9 21 3 21 3 15"/>
+          <line x1="21" y1="3" x2="14" y2="10"/>
+          <line x1="3" y1="21" x2="10" y2="14"/>
+        </svg>
+      </button>
+
+      <!-- Bouton quitter -->
+      <button class="toolbar-quit-btn" onmousedown="event.preventDefault()" onclick="quitApp()" title="Quitter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+
+    </div>
+
+    <!-- Workspace (sidebar + main) -->
+    <div id="workspace">
+
+      <!-- Volet latéral fichiers -->
+      <div id="sidebar">
+        <div id="sidebar-header">
+          <button id="sidebar-toggle" onclick="toggleSidebar()" title="Réduire le volet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <span id="sidebar-dir-name" title=""></span>
+          <button id="sidebar-search-btn" onclick="toggleSidebarSearch()" title="Rechercher dans les fichiers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
+          <button id="sidebar-refresh" onclick="if(_sidebarCurrentDir) loadSidebarDir(_sidebarCurrentDir)" title="Actualiser">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+          <button id="sidebar-new-dir" onclick="sidebarCreateDir()" title="Nouveau répertoire">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              <line x1="12" y1="11" x2="12" y2="17"/>
+              <line x1="9"  y1="14" x2="15" y2="14"/>
+            </svg>
+          </button>
+          <button id="sidebar-change-dir" onclick="changeSidebarDir()" title="Changer de répertoire">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Barre de recherche dans les fichiers -->
+        <div id="sidebar-search-bar">
+          <div id="sidebar-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="flex-shrink:0;opacity:.5">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input id="sidebar-search-input" type="text"
+                   placeholder="Rechercher dans les fichiers…"
+                   oninput="onSidebarSearchInput()"
+                   onkeydown="onSidebarSearchKeydown(event)">
+            <button class="sidebar-search-clear-btn" id="sidebar-search-clear"
+                    onclick="sidebarSearchClear()" title="Effacer">×</button>
+          </div>
+          <div id="sidebar-search-status"></div>
+          <div id="sidebar-filename-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="flex-shrink:0;opacity:.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <circle cx="11" cy="16" r="3"/><line x1="18" y1="21" x2="15.5" y2="18.5"/>
+            </svg>
+            <input id="sidebar-filename-search-input" type="text"
+                   placeholder="Rechercher un fichier par son nom…"
+                   oninput="onSidebarFilenameSearchInput()"
+                   onkeydown="onSidebarFilenameSearchKeydown(event)">
+            <button class="sidebar-search-clear-btn" id="sidebar-filename-search-clear"
+                    onclick="sidebarFilenameSearchClear()" title="Effacer">×</button>
+          </div>
+          <div id="sidebar-filename-search-status"></div>
+        </div>
+
+        <div id="sidebar-files"></div>
+        <div id="sidebar-search-results"></div>
+        <div id="sidebar-filename-search-results"></div>
+      </div>
+
+      <!-- Poignée de redimensionnement sidebar (hors overflow:hidden) -->
+      <div id="sidebar-resize-handle" title="Redimensionner"></div>
+
+      <!-- Main content wrapper (règle de tabulation + panneaux) -->
+      <div id="main-wrapper">
+        <div id="tab-ruler" title="">
+          <canvas id="tab-ruler-canvas"></canvas>
+        </div>
+
+      <!-- Main content -->
+      <div id="main">
+        <div id="preview-pane">
+          <div id="preview"></div>
+        </div>
+        <!-- Panneau de visualisation HTML -->
+        <div id="html-pane" style="display: none; width: 100%; height: 100%;">
+          <iframe id="html-viewer" sandbox="allow-same-origin allow-scripts" style="width: 100%; height: 100%; border: none; background: white;"></iframe>
+        </div>
+        <!-- Panneau de visualisation PDF -->
+        <div id="pdf-pane" style="display: none; width: 100%; height: 100%;">
+          <iframe id="pdf-viewer" style="width: 100%; height: 100%; border: none; background: #525659;"></iframe>
+        </div>
+        <!-- Visionneuse d'images (PNG, JPG, GIF, BMP, WEBP, SVG, ICO) -->
+        <div id="image-pane">
+          <div id="image-zoom-bar">
+            <button class="img-zoom-btn" onmousedown="event.preventDefault()" onclick="imageZoomOut()" title="Dézoomer">−</button>
+            <span id="image-zoom-label" onclick="imageZoomReset()" title="Réinitialiser le zoom">100%</span>
+            <button class="img-zoom-btn" onmousedown="event.preventDefault()" onclick="imageZoomIn()" title="Zoomer">+</button>
+          </div>
+          <div id="image-scroll">
+            <img id="image-viewer" alt="">
+          </div>
+        </div>
+
+        <div id="source-pane">
+          <div id="source-left">
+            <div id="source-scroll">
+              <div id="source-wrapper">
+                <div id="source-line-numbers" aria-hidden="true"></div>
+                <textarea id="source-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <canvas id="source-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition YAML -->
+        <div id="yaml-pane">
+          <div id="yaml-scroll">
+            <div id="yaml-wrapper">
+              <div id="yaml-line-numbers" aria-hidden="true"></div>
+              <div id="yaml-editor-area">
+                <pre id="yaml-highlight" aria-hidden="true"></pre>
+                <textarea id="yaml-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <canvas id="yaml-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition CSS -->
+        <div id="css-pane">
+          <div id="css-scroll">
+            <div id="css-wrapper">
+              <div id="css-line-numbers" aria-hidden="true"></div>
+              <div id="css-editor-area">
+                <pre id="css-highlight" aria-hidden="true"></pre>
+                <textarea id="css-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <canvas id="css-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition Lua -->
+        <div id="lua-pane">
+          <div id="lua-scroll">
+            <div id="lua-wrapper">
+              <div id="lua-line-numbers" aria-hidden="true"></div>
+              <div id="lua-editor-area">
+                <pre id="lua-highlight" aria-hidden="true"></pre>
+                <textarea id="lua-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <canvas id="lua-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition JSON -->
+        <div id="json-pane">
+          <div id="json-scroll">
+            <div id="json-wrapper">
+              <div id="json-line-numbers" aria-hidden="true"></div>
+              <div id="json-editor-area">
+                <pre id="json-highlight" aria-hidden="true"></pre>
+                <textarea id="json-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <div id="json-minimap-resize-handle"></div>
+          <canvas id="json-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition XML -->
+        <div id="xml-pane">
+          <div id="xml-scroll">
+            <div id="xml-wrapper">
+              <div id="xml-line-numbers" aria-hidden="true"></div>
+              <div id="xml-editor-area">
+                <pre id="xml-highlight" aria-hidden="true"></pre>
+                <textarea id="xml-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <div id="xml-minimap-resize-handle"></div>
+          <canvas id="xml-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau d'édition PlantUML -->
+        <div id="puml-pane">
+          <div id="puml-scroll">
+            <div id="puml-wrapper">
+              <div id="puml-line-numbers" aria-hidden="true"></div>
+              <div id="puml-editor-area">
+                <pre id="puml-highlight" aria-hidden="true"></pre>
+                <textarea id="puml-editor" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+          <div id="puml-preview-resize-handle" title="Redimensionner"></div>
+          <div id="puml-preview-panel">
+            <div id="puml-preview-header">
+              <span id="puml-preview-label">Aperçu</span>
+              <div id="puml-preview-fmt-btns">
+                <button class="puml-fmt-btn" id="puml-fmt-svg" onmousedown="event.preventDefault()" onclick="pumlPreviewSwitchFmt('svg')">SVG</button>
+                <button class="puml-fmt-btn" id="puml-fmt-png" onmousedown="event.preventDefault()" onclick="pumlPreviewSwitchFmt('png')">PNG</button>
+              </div>
+              <div id="puml-zoom-controls">
+                <button class="puml-zoom-btn" onmousedown="event.preventDefault()" onclick="pumlZoomOut()" title="Dézoomer">−</button>
+                <span id="puml-zoom-label" onclick="pumlZoomReset()" title="Réinitialiser le zoom">100%</span>
+                <button class="puml-zoom-btn" onmousedown="event.preventDefault()" onclick="pumlZoomIn()" title="Zoomer">+</button>
+              </div>
+              <button id="puml-preview-close" onmousedown="event.preventDefault()" onclick="closePumlPreview()" title="Fermer">×</button>
+            </div>
+            <div id="puml-preview-content">
+              <img id="puml-preview-img" alt="">
+              <span id="puml-preview-missing">Image introuvable — compilez d'abord le fichier</span>
+            </div>
+          </div>
+          <canvas id="puml-minimap" title="Plan du document — clic pour naviguer"></canvas>
+        </div>
+
+        <!-- Panneau de visualisation Log -->
+        <div id="log-pane">
+          <div id="log-toolbar">
+            <div id="log-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="flex-shrink:0;opacity:.6">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input id="log-search-input" type="text" placeholder="Rechercher dans le log…"
+                     oninput="onLogSearchInput()" onkeydown="onLogSearchKeydown(event)">
+              <span id="log-search-count"></span>
+              <button class="log-nav-btn" onclick="logSearchPrev()" title="Précédent (Shift+Entrée)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+              <button class="log-nav-btn" onclick="logSearchNext()" title="Suivant (Entrée)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <button class="log-nav-btn log-clear-btn" onclick="logSearchClear()" title="Effacer">×</button>
+            </div>
+            <span id="log-line-count"></span>
+          </div>
+          <div id="log-body">
+            <div id="log-content"></div>
+            <canvas id="log-minimap" title="Plan du document — clic pour naviguer"></canvas>
+          </div>
+        </div>
+
+        <!-- Panneau de compilation Quarto -->
+        <div id="compile-panel">
+          <div id="compile-resize-handle" title="Redimensionner"></div>
+          <div id="compile-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="compile-icon">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span id="compile-title">Compilation Quarto</span>
+            <span id="compile-status"></span>
+            <div class="compile-spacer"></div>
+            <button class="compile-btn" onclick="clearCompilePanel()" title="Effacer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
+            <button class="compile-btn" onclick="closeCompilePanel()" title="Fermer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <pre id="compile-output"></pre>
+        </div>
+
+      <!-- Barre de recherche (Ctrl+F) -->
+        <div id="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="search-input" placeholder="Rechercher…" autocomplete="off" spellcheck="false"
+                 oninput="onSearchInput()"
+                 onkeydown="onSearchKeydown(event)">
+          <span id="search-count" class="search-count"></span>
+          <button class="search-nav-btn" onclick="searchPrev()" title="Précédent (Maj+Entrée)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+          <button class="search-nav-btn" onclick="searchNext()" title="Suivant (Entrée)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <button class="search-close-btn" onclick="closeSearch()" title="Fermer (Échap)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      </div><!-- /main-wrapper -->
+
+      <!-- Poignée de redimensionnement TOC (hors overflow:hidden) -->
+      <div id="toc-resize-handle" title="Redimensionner"></div>
+
+      <!-- Volet sommaire (droite) -->
+      <div id="toc-panel">
+        <div id="toc-section">
+          <div id="toc-header" onclick="toggleTocSection()">
+            <svg class="metadata-toggle-icon toc-accordion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span id="toc-title">Sommaire</span>
+            <button id="toc-toggle" onclick="event.stopPropagation(); toggleTOC()" title="Réduire le volet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+          <div id="toc-body"></div>
+        </div>
+        <div id="toc-meta-resize-handle" title="Redimensionner"></div>
+        <!-- Section Métadonnées (en-tête YAML du document) -->
+        <div id="metadata-section">
+          <div id="metadata-header" onclick="toggleMetadataSection()">
+            <svg class="metadata-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span>Métadonnées</span>
+          </div>
+          <div id="metadata-body">
+            <div class="meta-row">
+              <label class="meta-label" for="meta-title">Titre</label>
+              <input type="text" id="meta-title" class="meta-input" oninput="onMetaFieldChange()">
+            </div>
+            <div class="meta-row">
+              <label class="meta-label" for="meta-abstract-title">Résumé (abstract-title)</label>
+              <textarea id="meta-abstract-title" class="meta-textarea" rows="3" oninput="onMetaFieldChange()"></textarea>
+            </div>
+            <div class="meta-row">
+              <label class="meta-label" for="meta-toc-depth">Profondeur du sommaire (toc-depth)</label>
+              <input type="number" id="meta-toc-depth" class="meta-input meta-input-narrow" min="1" max="6" oninput="onMetaFieldChange()">
+            </div>
+            <div class="meta-row meta-row-checkbox">
+              <input type="checkbox" id="meta-lightbox" onchange="onMetaFieldChange()">
+              <label class="meta-label" for="meta-lightbox">Lightbox (images)</label>
+            </div>
+            <div id="metadata-other-section">
+              <button id="metadata-other-toggle" type="button" onclick="toggleMetadataOther()">
+                <span>Autres champs YAML</span>
+                <svg class="metadata-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <textarea id="meta-other-yaml" class="meta-textarea meta-other-textarea" rows="4" spellcheck="false" placeholder="autre-cle: valeur" oninput="onMetaFieldChange()"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Status bar -->
+    <div id="statusbar">
+      <span id="status-file">Aucun fichier ouvert</span>
+      <div id="status-center">
+        <!-- Zoom -->
+        <div class="zoom-control">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+          <input type="range" id="zoom-slider" min="50" max="200" value="100" step="5"
+                 oninput="setZoom(this.value)" title="Zoom">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
+          </svg>
+          <span id="zoom-label">100%</span>
+        </div>
+
+        <!-- Bouton Source MD -->
+        <label class="source-toggle" title="Afficher le source Markdown (Ctrl+Shift+M)">
+          <input type="checkbox" id="source-toggle-input" onchange="toggleSourceMode(this.checked)">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Source MD</span>
+        </label>
+
+        <!-- Bouton Panneau TODO -->
+        <button id="todo-panel-btn" onmousedown="event.preventDefault()" onclick="openTodoPanel()" title="Panneau TODO">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="2"/>
+            <polyline points="4.5,5.5 6,7 8.5,4"/>
+            <line x1="10" y1="5.5" x2="13.5" y2="5.5"/>
+            <polyline points="4.5,9.5 6,11 8.5,8.5"/>
+            <line x1="10" y1="9.5" x2="13.5" y2="9.5"/>
+          </svg>
+        </button>
+
+        <!-- Bouton paramètres -->
+        <button id="statusbar-settings-btn" onmousedown="event.preventDefault()" onclick="openSettings()" title="Paramètres">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+
+        <!-- Bouton thème -->
+        <button id="theme-toggle-btn" onmousedown="event.preventDefault()" onclick="cycleTheme()" title="Changer le thème"></button>
+
+        <div class="zoom-control" id="status-width-control" title="Largeur de la colonne — Maj+molette&#10;Clic sur la valeur : réinitialiser à 780px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="4" width="6" height="16" rx="1"/>
+          </svg>
+          <input type="range" id="status-width-slider" min="300" max="1600" value="780" step="20"
+                 oninput="_applyContentMaxWidth(this.value)" title="Largeur de la colonne">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="16" rx="1"/>
+          </svg>
+          <span id="status-width-label" onclick="_applyContentMaxWidth(780)">780px</span>
+        </div>
+      </div>
+      <div id="status-right">
+        <span id="status-filetype"></span>
+        <span class="status-sep">|</span>
+        <span id="status-cursor"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fenêtre de paramètres -->
+  <!-- ── Sélecteur de projet (ouverture) ──────────────────────────────────── -->
+  <div id="project-chooser-overlay">
+    <div id="project-chooser">
+      <div class="proj-chooser-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+        </svg>
+      </div>
+      <h2 class="proj-chooser-title">Choisir un projet</h2>
+      <p class="proj-chooser-desc">Sélectionnez le répertoire de votre projet. Les paramètres seront enregistrés dans <code>settings.json</code> à la racine de ce répertoire.</p>
+      <button class="proj-chooser-btn-primary" onclick="chooseProjectFromDialog()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        Parcourir…
+      </button>
+      <div id="proj-recent-list" style="display:none"></div>
+      <button class="proj-chooser-skip" onclick="closeProjectChooser()">Passer</button>
+    </div>
+  </div>
+
+  <div id="settings-overlay" onclick="closeSettingsOnOverlay(event)">
+    <div id="settings-panel">
+      <div class="settings-header">
+        <div class="settings-header-left">
+          <h2>Paramètres du Projet</h2>
+          <span id="settings-project-path" class="settings-project-path" title="">(aucun projet)</span>
+        </div>
+        <div class="settings-header-right">
+          <button class="settings-btn" onclick="openProjectChooserFromSettings()">Changer de projet…</button>
+          <button class="settings-close" onclick="closeSettings()">×</button>
+        </div>
+      </div>
+      <div class="settings-main">
+      <!-- Onglets -->
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="general" onclick="switchSettingsTab('general')">Général</button>
+        <button class="settings-tab" data-tab="quarto"  onclick="switchSettingsTab('quarto')">Quarto</button>
+        <button class="settings-tab" data-tab="layout"  onclick="switchSettingsTab('layout')">Mise en page</button>
+        <button class="settings-tab" data-tab="fonts"   onclick="switchSettingsTab('fonts')">Polices</button>
+      </div>
+
+      <div class="settings-content">
+      <!-- Onglet Général -->
+      <div class="settings-tab-panel active" id="stab-general">
+        <div class="settings-body settings-body-2col">
+
+          <!-- Colonne 1 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Éditeur</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="tab-size-input">Intervalle de tabulation</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input type="number" id="tab-size-input" class="settings-number-input" min="1" max="8" value="4" style="width:60px">
+                  <span style="font-size:11px;color:var(--text-muted)">colonnes</span>
+                </div>
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Règle de tabulation</span>
+                <button class="settings-btn" onclick="resetTabStops()">Réinitialiser la règle</button>
+              </div>
+              <div class="settings-row" style="font-size:11px;color:var(--text-muted);padding-top:0">
+                Cliquez sur la règle (mode source) pour ajouter / supprimer un point d'arrêt
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Retour à la ligne automatique</span>
+                <label class="source-toggle">
+                  <input type="checkbox" id="source-wrap-enabled">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonne 2 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Correction orthographique</h3>
+              <div class="settings-row">
+                <span class="settings-label">Correction automatique</span>
+                <label class="source-toggle">
+                  <input type="checkbox" id="spellcheck-enabled">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="spellcheck-lang">Langue</label>
+                <select id="spellcheck-lang" class="settings-select">
+                  <option value="fr">Français</option>
+                  <option value="fr-BE">Français (Belgique)</option>
+                  <option value="fr-CH">Français (Suisse)</option>
+                  <option value="en">English</option>
+                  <option value="en-US">English (US)</option>
+                  <option value="en-GB">English (UK)</option>
+                  <option value="de">Deutsch</option>
+                  <option value="es">Español</option>
+                  <option value="it">Italiano</option>
+                  <option value="pt">Português</option>
+                  <option value="nl">Nederlands</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Onglet Quarto -->
+      <div class="settings-tab-panel" id="stab-quarto">
+        <div class="settings-body settings-body-2col">
+
+          <!-- Colonne 1 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Projet</h3>
+              <div class="settings-row">
+                <span class="settings-label">Dossier</span>
+                <div class="settings-dir-group">
+                  <input type="text" id="project-dir" class="settings-dir-input" readonly placeholder="(aucun)">
+                  <button class="settings-btn" onclick="chooseProjectDir()">Parcourir…</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="pdf-file-name">Nom du fichier PDF</label>
+                <input type="text" id="pdf-file-name" class="settings-text-input" placeholder="ex : monlivre.pdf">
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Fichiers de configuration</span>
+                <div class="settings-btn-group">
+                  <button class="settings-btn" onclick="openProjectQuartoFile('_quarto.yml')">_quarto.yml</button>
+                  <button class="settings-btn" onclick="openProjectQuartoFile('_quarto-html.yml')">_quarto-html.yml</button>
+                  <button class="settings-btn" onclick="openProjectQuartoFile('_quarto-pdf.yml')">_quarto-pdf.yml</button>
+                </div>
+              </div>
+            </div>
+            <div class="settings-section">
+              <h3>Bibliographie</h3>
+              <div class="settings-row">
+                <span class="settings-label">Fichier .bib</span>
+                <div class="settings-dir-group">
+                  <input type="text" id="bib-file" class="settings-dir-input" readonly placeholder="(aucun)">
+                  <button class="settings-btn" onclick="chooseBibFile()">Parcourir…</button>
+                </div>
+              </div>
+              <div class="settings-row" style="font-size:11px;color:var(--text-muted);padding-top:0">
+                Tapez <code>@</code> dans l'éditeur pour insérer une citation
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonne 2 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Compilation</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="compile-cmd-html">Ligne HTML</label>
+                <input type="text" id="compile-cmd-html" class="settings-text-input" placeholder="quarto render {file} --to html --profile html --no-clean">
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="compile-cmd-pdf">Ligne PDF</label>
+                <input type="text" id="compile-cmd-pdf" class="settings-text-input" placeholder="quarto render {file} --to pdf">
+              </div>
+              <div class="settings-row" style="font-size:11px;color:var(--text-muted);padding-top:0">
+                <code>{file}</code> sera remplacé par le chemin du fichier .qmd à compiler. Laissez vide pour la commande par défaut.
+              </div>
+            </div>
+            <div class="settings-section">
+              <h3>PlantUML</h3>
+              <div class="settings-row">
+                <span class="settings-label">plantuml.jar</span>
+                <div class="settings-dir-group">
+                  <input type="text" id="plantuml-jar" class="settings-dir-input" readonly placeholder="(commande plantuml ou chemin du JAR)">
+                  <button class="settings-btn" onclick="choosePlantumlJar()">Parcourir…</button>
+                </div>
+              </div>
+              <div class="settings-row" style="font-size:11px;color:var(--text-muted);padding-top:0">
+                Laissez vide si la commande <code>plantuml</code> est dans le PATH
+              </div>
+            </div>
+            <div class="settings-section">
+              <h3>Conversion XML → JSON</h3>
+              <div class="settings-row">
+                <span class="settings-label">Répertoire XSD par défaut</span>
+                <div class="settings-dir-group">
+                  <input type="text" id="xsd-default-dir" class="settings-dir-input" readonly placeholder="(aucun)">
+                  <button class="settings-btn" onclick="chooseXsdDefaultDir()">Parcourir…</button>
+                </div>
+              </div>
+              <div class="settings-row" style="font-size:11px;color:var(--text-muted);padding-top:0">
+                Répertoire proposé par défaut lors de la sélection d'un fichier XSD
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Onglet Polices -->
+      <div class="settings-tab-panel" id="stab-fonts">
+        <div class="settings-body settings-body-2col">
+
+          <!-- Colonne 1 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Polices de texte</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="font-text">Paragraphes</label>
+                <div class="settings-font-group">
+                  <select id="font-text" class="settings-select">
+                    <option value="system-ui, sans-serif">Système (défaut)</option>
+                    <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                    <option value="'Roboto', sans-serif">Roboto</option>
+                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Palatino', serif">Palatino</option>
+                  </select>
+                  <select id="font-size-text" class="settings-select size-select">
+                    <option value="11px">11</option><option value="12px">12</option>
+                    <option value="13px">13</option><option value="14px" selected>14</option>
+                    <option value="15px">15</option><option value="16px">16</option>
+                    <option value="18px">18</option><option value="20px">20</option>
+                    <option value="22px">22</option><option value="24px">24</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="font-table">Tableaux</label>
+                <div class="settings-font-group">
+                  <select id="font-table" class="settings-select">
+                    <option value="system-ui, sans-serif">Système (défaut)</option>
+                    <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                    <option value="'Roboto', sans-serif">Roboto</option>
+                    <option value="'Open Sans', sans-serif">Open Sans</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="Georgia, serif">Georgia</option>
+                  </select>
+                  <select id="font-size-table" class="settings-select size-select">
+                    <option value="11px">11</option><option value="12px">12</option>
+                    <option value="13px" selected>13</option><option value="14px">14</option>
+                    <option value="15px">15</option><option value="16px">16</option>
+                    <option value="18px">18</option><option value="20px">20</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row settings-row-top">
+                <span class="settings-label">Couleur des titres</span>
+                <div class="settings-theme-colors">
+                  <div class="settings-theme-color-row">
+                    <span class="settings-theme-badge theme-badge-dark">Sombre</span>
+                    <input type="color" id="heading-color-dark">
+                    <button class="settings-color-reset" onclick="resetHeadingColor('dark')" title="Réinitialiser">↺</button>
+                  </div>
+                  <div class="settings-theme-color-row">
+                    <span class="settings-theme-badge theme-badge-light">Clair</span>
+                    <input type="color" id="heading-color-light">
+                    <button class="settings-color-reset" onclick="resetHeadingColor('light')" title="Réinitialiser">↺</button>
+                  </div>
+                  <div class="settings-theme-color-row">
+                    <span class="settings-theme-badge theme-badge-system">Système</span>
+                    <input type="color" id="heading-color-system">
+                    <button class="settings-color-reset" onclick="resetHeadingColor('system')" title="Réinitialiser">↺</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonne 2 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Polices de code</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="font-code">Blocs de code</label>
+                <div class="settings-font-group">
+                  <select id="font-code" class="settings-select">
+                    <option value="'JetBrains Mono', 'Fira Code', monospace">JetBrains Mono</option>
+                    <option value="'Fira Code', monospace">Fira Code</option>
+                    <option value="'Cascadia Code', monospace">Cascadia Code</option>
+                    <option value="Consolas, monospace">Consolas</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                  </select>
+                  <select id="font-size-code" class="settings-select size-select">
+                    <option value="11px">11</option><option value="12px">12</option>
+                    <option value="13px" selected>13</option><option value="14px">14</option>
+                    <option value="15px">15</option><option value="16px">16</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="font-yaml">Blocs YAML</label>
+                <div class="settings-font-group">
+                  <select id="font-yaml" class="settings-select">
+                    <option value="'JetBrains Mono', 'Fira Code', monospace">JetBrains Mono</option>
+                    <option value="'Fira Code', monospace">Fira Code</option>
+                    <option value="'Cascadia Code', monospace">Cascadia Code</option>
+                    <option value="Consolas, monospace">Consolas</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                  </select>
+                  <select id="font-size-yaml" class="settings-select size-select">
+                    <option value="11px">11</option><option value="12px">12</option>
+                    <option value="13px" selected>13</option><option value="14px">14</option>
+                    <option value="15px">15</option><option value="16px">16</option>
+                  </select>
+                </div>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="font-lua">Code Lua</label>
+                <div class="settings-font-group">
+                  <select id="font-lua" class="settings-select">
+                    <option value="'JetBrains Mono', 'Fira Code', monospace">JetBrains Mono</option>
+                    <option value="'Fira Code', monospace">Fira Code</option>
+                    <option value="'Cascadia Code', monospace">Cascadia Code</option>
+                    <option value="Consolas, monospace">Consolas</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                  </select>
+                  <select id="font-size-lua" class="settings-select size-select">
+                    <option value="11px">11</option><option value="12px">12</option>
+                    <option value="13px" selected>13</option><option value="14px">14</option>
+                    <option value="15px">15</option><option value="16px">16</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Onglet Mise en page -->
+      <div class="settings-tab-panel" id="stab-layout">
+        <div class="settings-body settings-body-2col">
+
+          <!-- Colonne 1 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Aperçu</h3>
+              <div class="settings-row">
+                <span class="settings-label">Justifier le texte en prévisualisation</span>
+                <label class="source-toggle">
+                  <input type="checkbox" id="justify-enabled">
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Barre d'édition (indicateur gauche)</span>
+                <label class="source-toggle">
+                  <input type="checkbox" id="edit-bar-enabled" checked>
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="line-height-slider">Interligne</label>
+                <div class="settings-slider-group">
+                  <input type="range" id="line-height-slider" min="1.0" max="3.0" step="0.1" value="1.4"
+                         oninput="document.getElementById('line-height-label').textContent = parseFloat(this.value).toFixed(1)">
+                  <span id="line-height-label" class="settings-slider-label">1.4</span>
+                </div>
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="line-height-code-slider">Interligne blocs de code</label>
+                <div class="settings-slider-group">
+                  <input type="range" id="line-height-code-slider" min="1.0" max="2.5" step="0.05" value="1.45"
+                         oninput="document.getElementById('line-height-code-label').textContent = parseFloat(this.value).toFixed(2)">
+                  <span id="line-height-code-label" class="settings-slider-label">1.45</span>
+                </div>
+              </div>
+            </div>
+            <div class="settings-section">
+              <h3>Zoom</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="zoom-default-slider">Zoom par défaut</label>
+                <div class="settings-slider-group">
+                  <input type="range" id="zoom-default-slider" min="50" max="200" step="5" value="100"
+                         oninput="document.getElementById('zoom-default-label').textContent = this.value + '%'">
+                  <span id="zoom-default-label" class="settings-slider-label">100%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Colonne 2 -->
+          <div class="settings-col">
+            <div class="settings-section">
+              <h3>Volets</h3>
+              <div class="settings-row">
+                <label class="settings-label" for="sidebar-width-input">Volet gauche (px)</label>
+                <input type="number" id="sidebar-width-input" class="settings-number-input" min="120" max="600" value="370">
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="toc-width-input">Volet droit (px)</label>
+                <input type="number" id="toc-width-input" class="settings-number-input" min="120" max="600" value="370">
+              </div>
+              <div class="settings-row">
+                <label class="settings-label" for="log-minimap-width-input">Plan du document log (px)</label>
+                <input type="number" id="log-minimap-width-input" class="settings-number-input" min="60" max="300" value="100">
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      </div>
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeSettings()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="applySettings()">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu contextuel éditeur PlantUML -->
+  <div id="puml-context-menu" class="context-menu">
+    <div class="ctx-section-title">Presse-papiers</div>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="pumlCtxCopy()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier <span class="ctx-shortcut">Ctrl+C</span>
+    </button>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="pumlCtxCut()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="6" cy="20" r="3"/><circle cx="18" cy="20" r="3"/>
+        <line x1="5.27" y1="3" x2="19" y2="21"/>
+        <line x1="18.73" y1="3" x2="5" y2="21"/>
+      </svg>
+      Couper <span class="ctx-shortcut">Ctrl+X</span>
+    </button>
+    <button class="ctx-item" onclick="pumlCtxPaste()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+        <rect x="8" y="2" width="8" height="4" rx="1"/>
+      </svg>
+      Coller <span class="ctx-shortcut">Ctrl+V</span>
+    </button>
+    <div class="ctx-separator"></div>
+    <div class="ctx-section-title">Aperçu</div>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="pumlShowPreview('svg')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      Afficher l'image SVG
+    </button>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="pumlShowPreview('png')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      Afficher l'image PNG
+    </button>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="closePumlPreview(); hidePumlContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+      Fermer l'aperçu
+    </button>
+  </div>
+
+  <!-- Menu contextuel fichier dans le volet latéral -->
+  <div id="sidebar-file-context-menu">
+    <button class="ctx-item" id="sfctx-puml-both" onclick="sidebarFileCtxCompilePuml('both')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+      </svg>
+      Compiler PUML (SVG + PNG)
+    </button>
+    <button class="ctx-item" id="sfctx-puml-svg" onclick="sidebarFileCtxCompilePuml('svg')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+      </svg>
+      PUML — SVG uniquement
+    </button>
+    <button class="ctx-item" id="sfctx-puml-png" onclick="sidebarFileCtxCompilePuml('png')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+      </svg>
+      PUML — PNG uniquement
+    </button>
+    <div class="ctx-separator" id="sfctx-puml-sep"></div>
+    <button class="ctx-item" id="sfctx-compile" onclick="sidebarFileCtxCompile()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+        <polyline points="13 2 13 9 20 9"/>
+        <line x1="9" y1="14" x2="15" y2="14"/>
+        <line x1="9" y1="17" x2="13" y2="17"/>
+      </svg>
+      Compiler en HTML
+    </button>
+    <div class="ctx-separator" id="sfctx-compile-sep"></div>
+    <button class="ctx-item" id="sfctx-compile-pdf" onclick="sidebarFileCtxCompilePdf()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <text x="7" y="16" font-size="7" font-family="sans-serif" font-weight="bold" fill="currentColor" stroke="none">PDF</text>
+      </svg>
+      Compiler en PDF
+    </button>
+    <div class="ctx-separator" id="sfctx-compile-pdf-sep"></div>
+    <button class="ctx-item" id="sfctx-xml-convert" onclick="sidebarFileCtxConvertXml()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="M8 13h3M8 17h3"/>
+        <path d="M16 13l-2 2 2 2"/>
+      </svg>
+      Convertir en JSON
+    </button>
+    <div class="ctx-separator" id="sfctx-xml-sep"></div>
+    <button class="ctx-item" onclick="sidebarFileCtxOpen()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Ouvrir
+    </button>
+    <button class="ctx-item" onclick="sidebarFileCtxRename()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Renommer
+    </button>
+    <button class="ctx-item" onclick="sidebarFileCtxCopyName()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier le nom
+    </button>
+    <button class="ctx-item" onclick="sidebarFileCtxDuplicate()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        <line x1="15" y1="12" x2="15" y2="18"/>
+        <line x1="12" y1="15" x2="18" y2="15"/>
+      </svg>
+      Dupliquer
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-item--danger" onclick="sidebarFileCtxDelete()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      Supprimer
+    </button>
+  </div>
+
+  <!-- Modale de confirmation de suppression -->
+  <div id="delete-confirm-overlay" onclick="cancelDeleteFile(event)">
+    <div id="delete-confirm-dialog">
+      <div class="delete-confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <p id="delete-confirm-title" class="delete-confirm-title">Supprimer le fichier ?</p>
+      <p id="delete-confirm-name" class="delete-confirm-filename"></p>
+      <p id="delete-confirm-warn" class="delete-confirm-warn">Cette action est irréversible.</p>
+      <div class="delete-confirm-actions">
+        <button class="settings-btn settings-btn-cancel" onclick="cancelDeleteFile()">Annuler</button>
+        <button class="settings-btn settings-btn-danger" onclick="confirmDeleteFile()">Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boîte de dialogue Conversion XML → JSON -->
+  <div id="xml-convert-overlay" onclick="closeXmlConvertOnOverlay(event)">
+    <div id="xml-convert-dialog">
+      <div class="xml-convert-header">
+        <span class="xml-convert-title">Convertir XML → JSON</span>
+        <button class="settings-close" onclick="closeXmlConvertDialog()">×</button>
+      </div>
+      <div class="xml-convert-body">
+        <div class="settings-row">
+          <label class="settings-label" style="min-width:110px">Fichier XML</label>
+          <input type="text" id="xml-convert-xml-path" class="settings-dir-input" readonly style="flex:1">
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" style="min-width:110px">Fichier XSD <span style="font-size:10px;opacity:.7">(optionnel)</span></label>
+          <div class="settings-dir-group" style="flex:1">
+            <input type="text" id="xml-convert-xsd-path" class="settings-dir-input" readonly placeholder="(aucun — conversion sans validation)">
+            <button class="settings-btn" onclick="xmlConvertBrowseXsd()">Parcourir…</button>
+            <button class="settings-btn" onclick="xmlConvertClearXsd()" title="Effacer">✕</button>
+          </div>
+        </div>
+        <textarea id="xml-convert-log" class="xml-convert-log" readonly placeholder="Les messages apparaîtront ici…"></textarea>
+      </div>
+      <div class="xml-convert-footer">
+        <button id="xml-convert-open-md" class="settings-btn" onclick="xmlConvertOpenMd()" style="display:none">
+          Ouvrir le fichier ordre .md
+        </button>
+        <button id="xml-convert-btn" class="settings-btn settings-btn-primary" onclick="runXmlConvert()">Convertir</button>
+        <button class="settings-btn settings-btn-cancel" onclick="closeXmlConvertDialog()">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu contextuel répertoire dans le volet latéral -->
+  <div id="sidebar-dir-context-menu">
+    <button class="ctx-item" onclick="sidebarDirCtxCreateSubdir()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        <line x1="12" y1="11" x2="12" y2="17"/>
+        <line x1="9"  y1="14" x2="15" y2="14"/>
+      </svg>
+      Nouveau sous-répertoire…
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item" onclick="compileDirQuarto()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        <polyline points="13 16 9 12 5 16" stroke-width="2"/>
+        <line x1="9" y1="12" x2="9" y2="21"/>
+        <line x1="16" y1="8" x2="20" y2="8"/>
+        <line x1="18" y1="6" x2="18" y2="10"/>
+      </svg>
+      Compiler le répertoire en HTML
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-item--danger" onclick="sidebarDirCtxDelete()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+      Supprimer le répertoire
+    </button>
+  </div>
+
+  <!-- Menu contextuel onglet document -->
+  <div id="tab-context-menu">
+    <button class="ctx-item" id="tab-ctx-compile" onclick="compileTab()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+        <polyline points="13 2 13 9 20 9"/>
+        <line x1="9" y1="14" x2="15" y2="14"/>
+        <line x1="9" y1="17" x2="13" y2="17"/>
+      </svg>
+      Compiler en HTML
+    </button>
+    <div class="ctx-separator" id="tab-ctx-sep-file"></div>
+    <button class="ctx-item" id="tab-ctx-copy-name" onclick="tabCtxCopyName()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier le nom
+    </button>
+    <button class="ctx-item" id="tab-ctx-rename" onclick="tabCtxRenameFile()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Renommer
+    </button>
+  </div>
+
+  <!-- Menu contextuel spécifique aux tableaux -->
+  <div id="table-context-menu">
+    <div class="ctx-body">
+
+      <!-- ── Colonne 0 : Presse-papiers ─────────────────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Presse-papiers</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCopy()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copier <span class="ctx-shortcut">Ctrl+C</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCut()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6" cy="20" r="3"/><circle cx="18" cy="20" r="3"/>
+            <line x1="5.27" y1="3" x2="19" y2="21"/>
+            <line x1="18.73" y1="3" x2="5" y2="21"/>
+          </svg>
+          Couper <span class="ctx-shortcut">Ctrl+X</span>
+        </button>
+        <button class="ctx-item" onclick="ctxPaste()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+          </svg>
+          Coller <span class="ctx-shortcut">Ctrl+V</span>
+        </button>
+        <button class="ctx-item" onclick="pasteNoFormat(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <line x1="9" y1="14" x2="15" y2="14" stroke-width="1.5"/>
+            <line x1="9" y1="17" x2="13" y2="17" stroke-width="1.5"/>
+          </svg>
+          Coller sans format <span class="ctx-shortcut">Ctrl+⇧+V</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCopyStyle()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            <path d="M14 3l3 3" stroke-width="1.5"/>
+            <path d="M17 6l-5 5" stroke-width="1.5"/>
+          </svg>
+          Copier le style
+        </button>
+        <button class="ctx-item" id="table-ctx-paste-style" onmousedown="event.preventDefault()" onclick="ctxPasteStyle()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <path d="M12 12l3 3" stroke-width="1.5"/>
+            <path d="M15 15l-5 5" stroke-width="1.5"/>
+          </svg>
+          Coller le style
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="copyTableToClipboard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            <line x1="12" y1="13" x2="18" y2="13" stroke-width="1.5"/>
+            <line x1="12" y1="16" x2="18" y2="16" stroke-width="1.5"/>
+            <line x1="12" y1="19" x2="15" y2="19" stroke-width="1.5"/>
+          </svg>
+          Copier le tableau
+        </button>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 1 : Alignements ─────────────────────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Alignement horizontal</div>
+        <button class="ctx-item" onclick="alignColumn('left');  hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6"  x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/>
+            <line x1="3" y1="18" x2="18" y2="18"/>
+          </svg>
+          Gauche
+        </button>
+        <button class="ctx-item" onclick="alignColumn('center'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6"  x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/>
+            <line x1="4" y1="18" x2="20" y2="18"/>
+          </svg>
+          Centre
+        </button>
+        <button class="ctx-item" onclick="alignColumn('right');  hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6"  x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/>
+            <line x1="6" y1="18" x2="21" y2="18"/>
+          </svg>
+          Droite
+        </button>
+        <div class="ctx-separator"></div>
+        <div class="ctx-section-title">Alignement vertical</div>
+        <button class="ctx-item" onclick="alignColumnVertical('top'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="4" x2="20" y2="4" stroke-width="2.5"/><line x1="4" y1="9" x2="20" y2="9" opacity="0.6"/><line x1="4" y1="14" x2="14" y2="14" opacity="0.6"/>
+          </svg>
+          Haut
+        </button>
+        <button class="ctx-item" onclick="alignColumnVertical('middle'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="12" x2="20" y2="12" stroke-width="2.5"/><line x1="4" y1="7" x2="20" y2="7" opacity="0.6"/><line x1="4" y1="17" x2="14" y2="17" opacity="0.6"/>
+          </svg>
+          Milieu
+        </button>
+        <button class="ctx-item" onclick="alignColumnVertical('bottom'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="20" x2="20" y2="20" stroke-width="2.5"/><line x1="4" y1="15" x2="20" y2="15" opacity="0.6"/><line x1="4" y1="10" x2="14" y2="10" opacity="0.6"/>
+          </svg>
+          Bas
+        </button>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 2 : Lignes & Colonnes ───────────────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Ligne</div>
+        <button class="ctx-item" onclick="tableAddRowPrompt('above'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="13" width="18" height="8" rx="1"/>
+            <line x1="12" y1="3" x2="12" y2="11"/><line x1="8" y1="7" x2="16" y2="7"/>
+          </svg>
+          Insérer ligne au-dessus
+        </button>
+        <button class="ctx-item" onclick="tableAddRowPrompt('below'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="8" rx="1"/>
+            <line x1="12" y1="13" x2="12" y2="21"/><line x1="8" y1="17" x2="16" y2="17"/>
+          </svg>
+          Insérer ligne en-dessous
+        </button>
+        <button class="ctx-item ctx-danger" onclick="tableDeleteRow(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="8" width="18" height="8" rx="1"/>
+            <line x1="9" y1="11" x2="15" y2="13"/><line x1="15" y1="11" x2="9" y2="13"/>
+          </svg>
+          Supprimer la ligne
+        </button>
+        <div class="ctx-separator"></div>
+        <div class="ctx-section-title">Colonne</div>
+        <button class="ctx-item" onclick="tableAddCol('left');  hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="13" y="3" width="8" height="18" rx="1"/>
+            <line x1="3"  y1="12" x2="11" y2="12"/><line x1="7" y1="8" x2="7" y2="16"/>
+          </svg>
+          Insérer colonne à gauche
+        </button>
+        <button class="ctx-item" onclick="tableAddCol('right'); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="8" height="18" rx="1"/>
+            <line x1="13" y1="12" x2="21" y2="12"/><line x1="17" y1="8" x2="17" y2="16"/>
+          </svg>
+          Insérer colonne à droite
+        </button>
+        <button class="ctx-item ctx-danger" onclick="tableDeleteCol(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="8" y="3" width="8" height="18" rx="1"/>
+            <line x1="11" y1="9" x2="13" y2="15"/><line x1="13" y1="9" x2="11" y2="15"/>
+          </svg>
+          Supprimer la colonne
+        </button>
+        <div class="ctx-separator"></div>
+        <button class="ctx-item" onclick="openColWidthDialog(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="4"  x2="8"  y2="20"/>
+            <line x1="16" y1="4" x2="16" y2="20"/>
+          </svg>
+          Largeur des colonnes…
+        </button>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 3 : Mise en forme + Couleur + Listes + Supprimer ──────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Mise en forme</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyBold(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+          </svg>
+          Gras
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyItalic(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="4" x2="10" y2="4"/>
+            <line x1="14" y1="20" x2="5" y2="20"/>
+            <line x1="15" y1="4" x2="9" y2="20"/>
+          </svg>
+          Italique
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyUnderline(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M6 4v6a6 6 0 0 0 12 0V4"/>
+            <line x1="4" y1="20" x2="20" y2="20"/>
+          </svg>
+          Souligner
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyStrikethrough(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <path d="M17.5 6.5C17.5 4.5 15.5 3 12 3S6 4.5 6 7c0 2 1.5 3 3.5 3.5"/>
+            <path d="M6.5 17.5C6.5 19.5 8.5 21 12 21s6-1.5 6-4c0-2-1.5-3-3.5-3.5"/>
+          </svg>
+          Barré
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyCode(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          Code inline
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="tableInsertLink(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          Lien <span class="ctx-shortcut">Ctrl+K</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="clearFormatting(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 6l12 12M4 19h16"/>
+            <path d="M8 4h12l-4 6H8z"/>
+          </svg>
+          Effacer le formatage
+          <span class="ctx-shortcut">Ctrl+Shift+E</span>
+        </button>
+        <div class="ctx-separator"></div>
+        <div class="ctx-section-title">Couleur</div>
+        <div class="ctx-inline-colors">
+          <div class="ctx-colors-label">Surbrillance</div>
+          <div class="ctx-color-row">
+            <button class="ctx-color-swatch ctx-color-none" title="Aucune couleur" onmousedown="event.preventDefault()" onclick="applyHighlight(null); hideTableContextMenu()">✕</button>
+            <button class="ctx-color-swatch" title="Jaune"      style="background:Yellow"      onmousedown="event.preventDefault()" onclick="applyHighlight('Yellow');      hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Orange"     style="background:Orange"      onmousedown="event.preventDefault()" onclick="applyHighlight('Orange');      hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Vert clair" style="background:LightGreen"  onmousedown="event.preventDefault()" onclick="applyHighlight('LightGreen');  hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Cyan"       style="background:Cyan"        onmousedown="event.preventDefault()" onclick="applyHighlight('Cyan');        hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Rose"       style="background:LightPink"   onmousedown="event.preventDefault()" onclick="applyHighlight('LightPink');   hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Lavande"    style="background:Lavender"    onmousedown="event.preventDefault()" onclick="applyHighlight('Lavender');    hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Saumon"     style="background:LightSalmon" onmousedown="event.preventDefault()" onclick="applyHighlight('LightSalmon'); hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu ciel"  style="background:SkyBlue"     onmousedown="event.preventDefault()" onclick="applyHighlight('SkyBlue');     hideTableContextMenu()"></button>
+          </div>
+          <div class="ctx-colors-sep"></div>
+          <div class="ctx-colors-label">Couleur du texte</div>
+          <div class="ctx-color-row">
+            <button class="ctx-color-swatch ctx-color-none" title="Aucune couleur" onmousedown="event.preventDefault()" onclick="applyTextColor(null); hideTableContextMenu()">✕</button>
+            <button class="ctx-color-swatch" title="Noir"       style="background:Black"       onmousedown="event.preventDefault()" onclick="applyTextColor('Black');       hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Rouge"      style="background:Crimson"     onmousedown="event.preventDefault()" onclick="applyTextColor('Crimson');     hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu"       style="background:RoyalBlue"   onmousedown="event.preventDefault()" onclick="applyTextColor('RoyalBlue');   hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Vert"       style="background:ForestGreen" onmousedown="event.preventDefault()" onclick="applyTextColor('ForestGreen'); hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Violet"     style="background:Purple"      onmousedown="event.preventDefault()" onclick="applyTextColor('Purple');      hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Olive"      style="background:Olive"       onmousedown="event.preventDefault()" onclick="applyTextColor('Olive');       hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu-vert"  style="background:Teal"        onmousedown="event.preventDefault()" onclick="applyTextColor('Teal');        hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Orange"     style="background:DarkOrange"  onmousedown="event.preventDefault()" onclick="applyTextColor('DarkOrange');  hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Gris"       style="background:DimGray"     onmousedown="event.preventDefault()" onclick="applyTextColor('DimGray');     hideTableContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu acier" style="background:SteelBlue"   onmousedown="event.preventDefault()" onclick="applyTextColor('SteelBlue');   hideTableContextMenu()"></button>
+          </div>
+        </div>
+        <div class="ctx-separator"></div>
+        <div class="ctx-section-title">Listes</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyBulletList(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="9" y1="6"  x2="20" y2="6"/>
+            <line x1="9" y1="12" x2="20" y2="12"/>
+            <line x1="9" y1="18" x2="20" y2="18"/>
+            <circle cx="4" cy="6"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+          Liste à puces
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyOrderedList(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="10" y1="6"  x2="21" y2="6"/>
+            <line x1="10" y1="12" x2="21" y2="12"/>
+            <line x1="10" y1="18" x2="21" y2="18"/>
+            <text x="1" y="8"  font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">1.</text>
+            <text x="1" y="14" font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">2.</text>
+            <text x="1" y="20" font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">3.</text>
+          </svg>
+          Liste numérotée
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyCheckboxList(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="5" height="5" rx="1"/>
+            <polyline points="4.2 6.5 5.2 7.8 7.5 5" stroke-width="1.8"/>
+            <rect x="3" y="10" width="5" height="5" rx="1"/>
+            <rect x="3" y="16" width="5" height="5" rx="1"/>
+            <line x1="11" y1="6.5"  x2="21" y2="6.5"/>
+            <line x1="11" y1="12.5" x2="21" y2="12.5"/>
+            <line x1="11" y1="18.5" x2="21" y2="18.5"/>
+          </svg>
+          Liste à cocher <span class="ctx-shortcut">Ctrl+⇧+F</span>
+        </button>
+        <button class="ctx-item" id="table-ctx-tight-list" onmousedown="event.preventDefault()" onclick="tableToggleTightList(); hideTableContextMenu()" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="9" y1="5"  x2="20" y2="5"/>
+            <line x1="9" y1="9"  x2="20" y2="9"/>
+            <line x1="9" y1="13" x2="20" y2="13"/>
+            <line x1="9" y1="17" x2="20" y2="17"/>
+            <circle cx="4" cy="5"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="9"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="13" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="17" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+          <span id="table-ctx-tight-label">Liste serrée</span>
+          <span class="ctx-shortcut">Ctrl+⇧+P</span>
+        </button>
+        <div class="ctx-separator"></div>
+        <button class="ctx-item ctx-danger" onclick="tableDelete(); hideTableContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4h6v2"/>
+          </svg>
+          Supprimer le tableau
+        </button>
+      </div>
+
+    </div><!-- .ctx-body -->
+  </div>
+
+  <!-- Boîte de dialogue DIV conditionnelle -->
+  <div id="fdiv-overlay" onclick="closeFDivDialog(event)">
+    <div id="fdiv-dialog">
+      <div class="settings-header">
+        <h2>Propriétés de la DIV <span id="fdiv-level-badge" class="fdiv-level-badge"></span></h2>
+        <button class="settings-close" onclick="closeFDivDialog()">×</button>
+      </div>
+      <!-- Barre de navigation parent ↔ enfants -->
+      <div class="fdiv-nav" id="fdiv-nav"></div>
+      <div class="fdiv-body">
+
+        <!-- Ligne classes actives -->
+        <div class="fdiv-field-row">
+          <label class="fdiv-field-label" for="fdiv-class">Classes actives</label>
+          <input type="text" id="fdiv-class" class="fdiv-field-input"
+                 placeholder="column-screen-right my-style …"
+                 title="Classes séparées par des espaces, sans point"
+                 oninput="_fdivSyncChips()">
+        </div>
+
+        <!-- Deux listes côte à côte -->
+        <div class="fdiv-lists-row">
+          <!-- Liste Quarto -->
+          <div class="fdiv-list-panel">
+            <div class="fdiv-list-header">Quarto</div>
+            <div class="fdiv-list" id="fdiv-list-quarto">
+              <div class="fdiv-list-sep">Visibilité</div>
+              <div class="fdiv-list-item" data-cls="content-visible"  onclick="_fdivToggleClass('content-visible')">content-visible</div>
+              <div class="fdiv-list-item" data-cls="content-hidden"   onclick="_fdivToggleClass('content-hidden')">content-hidden</div>
+              <div class="fdiv-list-sep">Marges</div>
+              <div class="fdiv-list-item" data-cls="column-margin"              onclick="_fdivToggleClass('column-margin')">column-margin</div>
+              <div class="fdiv-list-sep">Mise en page</div>
+              <div class="fdiv-list-item" data-cls="column-body"                onclick="_fdivToggleClass('column-body')">column-body</div>
+              <div class="fdiv-list-item" data-cls="column-body-outset"         onclick="_fdivToggleClass('column-body-outset')">column-body-outset</div>
+              <div class="fdiv-list-item" data-cls="column-body-outset-right"   onclick="_fdivToggleClass('column-body-outset-right')">column-body-outset-right</div>
+              <div class="fdiv-list-item" data-cls="column-body-outset-left"    onclick="_fdivToggleClass('column-body-outset-left')">column-body-outset-left</div>
+              <div class="fdiv-list-item" data-cls="column-page"                onclick="_fdivToggleClass('column-page')">column-page</div>
+              <div class="fdiv-list-item" data-cls="column-page-right"          onclick="_fdivToggleClass('column-page-right')">column-page-right</div>
+              <div class="fdiv-list-item" data-cls="column-page-left"           onclick="_fdivToggleClass('column-page-left')">column-page-left</div>
+              <div class="fdiv-list-item" data-cls="column-screen"              onclick="_fdivToggleClass('column-screen')">column-screen</div>
+              <div class="fdiv-list-item" data-cls="column-screen-right"        onclick="_fdivToggleClass('column-screen-right')">column-screen-right</div>
+              <div class="fdiv-list-item" data-cls="column-screen-left"         onclick="_fdivToggleClass('column-screen-left')">column-screen-left</div>
+              <div class="fdiv-list-item" data-cls="column-screen-inset"        onclick="_fdivToggleClass('column-screen-inset')">column-screen-inset</div>
+              <div class="fdiv-list-item" data-cls="column-screen-inset-right"  onclick="_fdivToggleClass('column-screen-inset-right')">column-screen-inset-right</div>
+              <div class="fdiv-list-item" data-cls="column-screen-inset-left"   onclick="_fdivToggleClass('column-screen-inset-left')">column-screen-inset-left</div>
+              <div class="fdiv-list-sep">Callouts</div>
+              <div class="fdiv-list-item" data-cls="callout-warning"   onclick="_fdivToggleClass('callout-warning')">callout-warning</div>
+              <div class="fdiv-list-item" data-cls="callout-note"      onclick="_fdivToggleClass('callout-note')">callout-note</div>
+              <div class="fdiv-list-item" data-cls="callout-tip"       onclick="_fdivToggleClass('callout-tip')">callout-tip</div>
+              <div class="fdiv-list-item" data-cls="callout-important" onclick="_fdivToggleClass('callout-important')">callout-important</div>
+              <div class="fdiv-list-item" data-cls="callout-caution"   onclick="_fdivToggleClass('callout-caution')">callout-caution</div>
+            </div>
+          </div>
+
+          <!-- Liste styles projet -->
+          <div class="fdiv-list-panel" id="fdiv-project-section">
+            <div class="fdiv-list-header">
+              Styles projet
+              <span id="fdiv-project-css-path" class="fdiv-list-header-sub"></span>
+            </div>
+            <div class="fdiv-list" id="fdiv-list-project">
+              <div class="fdiv-list-empty">Aucun fichier<br>conf/styles.css</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Format + Largeur + Alignement -->
+        <div class="fdiv-options-row">
+          <div class="fdiv-option-group">
+            <label class="fdiv-field-label" for="fdiv-format">Format cible</label>
+            <select id="fdiv-format" class="fdiv-field-select">
+              <option value="">— tous —</option>
+              <option value="html">HTML</option>
+              <option value="pdf">PDF</option>
+              <option value="revealjs">Reveal.js</option>
+              <option value="docx">Word (docx)</option>
+              <option value="odt">OpenDocument</option>
+              <option value="pptx">PowerPoint</option>
+              <option value="typst">Typst</option>
+            </select>
+          </div>
+
+          <div class="fdiv-option-group fdiv-option-group--wide">
+            <label class="fdiv-field-label">Largeur <span id="fdiv-width-pct" class="fdiv-width-badge">100%</span></label>
+            <div class="fdiv-width-inline">
+              <input type="checkbox" id="fdiv-width-enable" class="fdiv-width-cb"
+                     onchange="_fdivWidthToggle(this.checked)">
+              <input type="range" id="fdiv-width-slider" class="cw-slider" min="10" max="100" value="100"
+                     oninput="document.getElementById('fdiv-width-number').value=this.value;document.getElementById('fdiv-width-pct').textContent=this.value+'%'" disabled>
+              <input type="number" id="fdiv-width-number" class="cw-number" min="10" max="100" value="100"
+                     oninput="document.getElementById('fdiv-width-slider').value=this.value;document.getElementById('fdiv-width-pct').textContent=this.value+'%'" disabled>
+            </div>
+          </div>
+
+          <div class="fdiv-option-group">
+            <label class="fdiv-field-label">Alignement</label>
+            <label class="fdiv-enable-label">
+              <input type="checkbox" id="fdiv-margin">
+              Centrer <code class="fdiv-code">margin: auto</code>
+            </label>
+          </div>
+        </div>
+
+        <!-- Aperçu du contenu -->
+        <div class="fdiv-preview-section" id="fdiv-preview-section">
+          <div class="fdiv-preview-toggle" onclick="fdivTogglePreview()">
+            <span>📌 Aperçu du contenu</span>
+            <span id="fdiv-preview-arrow">&#9654;</span>
+          </div>
+          <div id="fdiv-preview-content" class="fdiv-preview-content"></div>
+        </div>
+
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-danger" onclick="deleteFDiv()">Supprimer</button>
+<button class="settings-btn settings-btn-cancel" onclick="closeFDivDialog()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="confirmFDivDialog()">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu contextuel DIV conditionnelle -->
+  <div id="fdiv-context-menu">
+    <button class="ctx-item" onclick="openFDivDialog(); hideFDivContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Propriétés…
+    </button>
+    <button class="ctx-item" onclick="insertNestedFDiv(); hideFDivContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="2" y="3" width="20" height="18" rx="2" stroke-dasharray="4 2"/>
+        <rect x="6" y="7" width="12" height="10" rx="1.5" stroke-dasharray="3 1.5"/>
+        <line x1="12" y1="10" x2="12" y2="14"/><line x1="10" y1="12" x2="14" y2="12"/>
+      </svg>
+      Ajouter une DIV imbriquée
+    </button>
+    <div class="ctx-separator" id="fdiv-ctx-move-sep" style="display:none"></div>
+    <button class="ctx-item" id="fdiv-ctx-move-up" style="display:none" onclick="moveFDiv(-1); hideFDivContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+      Monter
+    </button>
+    <button class="ctx-item" id="fdiv-ctx-move-down" style="display:none" onclick="moveFDiv(1); hideFDivContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+      Descendre
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-danger" onclick="deleteFDiv()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      Supprimer la DIV
+    </button>
+  </div>
+
+  <!-- Menu contextuel spécifique aux blocs de code -->
+  <div id="code-block-context-menu">
+    <button class="ctx-item" id="code-ctx-wrap-btn" onclick="wrapCodeBlockInDiv(); hideCodeBlockContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <rect x="2" y="3" width="20" height="18" rx="2" stroke-dasharray="4 2"/>
+        <line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/>
+      </svg>
+      Envelopper dans une DIV
+    </button>
+    <button class="ctx-item ctx-danger" id="code-ctx-unwrap-btn" onclick="unwrapCodeBlockFromDiv(); hideCodeBlockContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+      </svg>
+      Retirer la DIV englobante
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-danger" onclick="deleteCodeBlock(); hideCodeBlockContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+      </svg>
+      Supprimer le bloc de code
+    </button>
+  </div>
+
+  <!-- Menu contextuel spécifique aux images -->
+  <div id="img-context-menu">
+    <button class="ctx-item" onclick="openImageDialog(); hideImageContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Propriétés…
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-danger" onclick="deleteImage(); hideImageContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      Supprimer l'image
+    </button>
+  </div>
+
+  <!-- Boîte de dialogue propriétés image -->
+  <div id="img-overlay" onclick="closeImageDialog(event)">
+    <div id="img-dialog">
+      <div class="settings-header">
+        <h2>Propriétés de l'image</h2>
+        <button class="settings-close" onclick="closeImageDialog()">×</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-row">
+          <label class="settings-label">Image</label>
+          <div class="img-file-row">
+            <span id="img-file-name" class="img-file-name">—</span>
+            <button class="settings-btn" onclick="copyImagePath()" title="Copier le chemin relatif">Copier</button>
+            <button class="settings-btn" onclick="changeImageFile()">Changer…</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Légende</label>
+          <div class="img-caption-wrap">
+            <input type="text" id="img-caption-input" class="cw-caption-input" placeholder="Texte… ou [texte](url) pour un lien">
+            <button class="settings-btn" onmousedown="event.preventDefault()" onclick="insertCaptionLink()" title="Insérer un lien dans la légende">Lien…</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Taille</label>
+          <div class="cw-group">
+            <input type="range"  id="img-width-slider" class="cw-slider" min="5" max="100" value="100"
+                   oninput="document.getElementById('img-width-number').value=this.value">
+            <input type="number" id="img-width-number" class="cw-number" min="5" max="100" value="100"
+                   oninput="document.getElementById('img-width-slider').value=this.value">
+            <span class="cw-unit">%</span>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Alignement</label>
+          <div class="img-align-group">
+            <button class="img-align-btn" data-align="left"   onclick="selectImageAlign('left')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+              Gauche
+            </button>
+            <button class="img-align-btn" data-align="center" onclick="selectImageAlign('center')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+              Centre
+            </button>
+            <button class="img-align-btn" data-align="right"  onclick="selectImageAlign('right')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+              Droite
+            </button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Visibilité</label>
+          <div class="img-align-group">
+            <button class="img-align-btn active" data-vis="always" onclick="selectImageVisibility('always')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="12" rx="10" ry="6"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+              </svg>
+              Toujours
+            </button>
+            <button class="img-align-btn" data-vis="html" onclick="selectImageVisibility('html')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 9 2 12 4 15"/><polyline points="20 9 22 12 20 15"/>
+                <line x1="12" y1="5" x2="12" y2="19" stroke-dasharray="3 2"/>
+              </svg>
+              HTML seul
+            </button>
+            <button class="img-align-btn" data-vis="pdf" onclick="selectImageVisibility('pdf')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <text x="7" y="18" font-size="5.5" font-family="monospace" fill="currentColor" stroke="none" font-weight="bold">PDF</text>
+              </svg>
+              PDF seul
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeImageDialog()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="confirmImageDialog()">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boîte de dialogue largeur des colonnes -->
+  <div id="col-width-overlay" onclick="closeColWidthDialog(event)">
+    <div id="col-width-dialog">
+      <div class="settings-header">
+        <h2>Largeur des colonnes</h2>
+        <button class="settings-close" onclick="closeColWidthDialog()">×</button>
+      </div>
+      <div class="settings-body" id="col-width-body"></div>
+      <div class="cw-caption-row">
+        <svg class="cw-caption-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+        <input type="text" id="cw-caption" class="cw-caption-input" placeholder="Légende du tableau (optionnel)…">
+      </div>
+      <div class="cw-layout-row">
+        <svg class="cw-caption-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <polyline points="7 8 3 12 7 16"/><polyline points="17 8 21 12 17 16"/>
+        </svg>
+        <span class="cw-layout-label">Largeur tableau</span>
+        <div class="cw-group">
+          <input type="range" id="cw-table-width-slider" class="cw-slider" min="10" max="100" value="100"
+                 oninput="document.getElementById('cw-table-width-number').value=this.value">
+          <input type="number" id="cw-table-width-number" class="cw-number" min="10" max="100" value="100"
+                 oninput="document.getElementById('cw-table-width-slider').value=this.value">
+          <span class="cw-unit">%</span>
+        </div>
+      </div>
+      <div class="cw-options-row">
+        <label class="cw-check-card" id="cw-bordered-card">
+          <input type="checkbox" id="cw-bordered">
+          <svg class="cw-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18">
+            <rect x="2" y="2" width="20" height="20" rx="2"/>
+            <line x1="2" y1="9" x2="22" y2="9"/><line x1="2" y1="16" x2="22" y2="16"/>
+            <line x1="9" y1="2" x2="9" y2="22"/><line x1="16" y1="2" x2="16" y2="22"/>
+          </svg>
+          <div class="cw-card-text">
+            <span class="cw-card-title">Encadrement</span>
+            <span class="cw-card-code">.bordered</span>
+          </div>
+        </label>
+        <label class="cw-check-card" id="cw-striped-card">
+          <input type="checkbox" id="cw-striped">
+          <svg class="cw-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18">
+            <rect x="2" y="2" width="20" height="20" rx="2"/>
+            <rect x="2" y="9" width="20" height="6" fill="currentColor" opacity="0.25" stroke="none"/>
+            <line x1="2" y1="9" x2="22" y2="9"/><line x1="2" y1="15" x2="22" y2="15"/>
+          </svg>
+          <div class="cw-card-text">
+            <span class="cw-card-title">Lignes rayées</span>
+            <span class="cw-card-code">.striped</span>
+          </div>
+        </label>
+        <label class="cw-check-card" id="cw-center-card">
+          <input type="checkbox" id="cw-table-center">
+          <svg class="cw-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18">
+            <line x1="12" y1="2" x2="12" y2="22"/>
+            <rect x="4" y="6" width="16" height="12" rx="1"/>
+          </svg>
+          <div class="cw-card-text">
+            <span class="cw-card-title">Centrer</span>
+            <span class="cw-card-code">margin: auto</span>
+          </div>
+        </label>
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeColWidthDialog()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="confirmColWidths()">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="context-menu">
+
+    <!-- ── Correction orthographique (conditionnelle) ────────────────────────── -->
+    <div id="ctx-spell-section" style="display:none">
+      <div class="ctx-section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span id="ctx-spell-word"></span>
+      </div>
+      <div id="ctx-spell-items"></div>
+      <button class="ctx-item" onclick="ctxIgnoreSpellWord()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+        </svg>
+        Ignorer ce mot
+      </button>
+      <div class="ctx-separator"></div>
+    </div>
+
+    <!-- ── Signet (conditionnel, visible sur titre uniquement) ───────────────── -->
+    <button class="ctx-item" id="ctx-bookmark" onclick="openBookmarkDialog(_bookmarkHeadingNode); hideContextMenu()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+      </svg>
+      Signet… <span class="ctx-shortcut">Ctrl+⇧+B</span>
+    </button>
+    <div class="ctx-separator" id="ctx-bookmark-sep" style="display:none"></div>
+
+    <!-- ── Corps 3 colonnes ──────────────────────────────────────────────────── -->
+    <div class="ctx-body">
+
+      <!-- ── Colonne 1 : Presse-papiers ──────────────────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Presse-papiers</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCopy()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copier <span class="ctx-shortcut">Ctrl+C</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCut()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="6" cy="20" r="3"/><circle cx="18" cy="20" r="3"/>
+            <line x1="5.27" y1="3" x2="19" y2="21"/>
+            <line x1="18.73" y1="3" x2="5" y2="21"/>
+          </svg>
+          Couper <span class="ctx-shortcut">Ctrl+X</span>
+        </button>
+        <button class="ctx-item" onclick="ctxPaste()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+          </svg>
+          Coller <span class="ctx-shortcut">Ctrl+V</span>
+        </button>
+        <button class="ctx-item" onclick="pasteNoFormat(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <line x1="9" y1="14" x2="15" y2="14" stroke-width="1.5"/>
+            <line x1="9" y1="17" x2="13" y2="17" stroke-width="1.5"/>
+          </svg>
+          Coller sans format <span class="ctx-shortcut">Ctrl+⇧+V</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxCopyStyle()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            <path d="M14 3l3 3" stroke-width="1.5"/>
+            <path d="M17 6l-5 5" stroke-width="1.5"/>
+          </svg>
+          Copier le style
+        </button>
+        <button class="ctx-item" id="ctx-paste-style" onmousedown="event.preventDefault()" onclick="ctxPasteStyle()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1"/>
+            <path d="M12 12l3 3" stroke-width="1.5"/>
+            <path d="M15 15l-5 5" stroke-width="1.5"/>
+          </svg>
+          Coller le style
+        </button>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 2 : Texte + Mise en forme + Couleur ────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Texte</div>
+        <button class="ctx-item" id="ctx-bold" onmousedown="event.preventDefault()" onclick="applyBold(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+          </svg>
+          Gras <span class="ctx-shortcut">Ctrl+B</span>
+        </button>
+        <button class="ctx-item" id="ctx-italic" onmousedown="event.preventDefault()" onclick="applyItalic(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="4" x2="10" y2="4"/>
+            <line x1="14" y1="20" x2="5" y2="20"/>
+            <line x1="15" y1="4" x2="9" y2="20"/>
+          </svg>
+          Italique <span class="ctx-shortcut">Ctrl+I</span>
+        </button>
+        <button class="ctx-item" onclick="openLinkDialog(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          Lien <span class="ctx-shortcut">Ctrl+K</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyCode(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          Code inline <span class="ctx-shortcut">Ctrl+E</span>
+        </button>
+
+        <div class="ctx-group-title">Mise en forme</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyUnderline(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" y1="20" x2="20" y2="20"/>
+          </svg>
+          Souligner <span class="ctx-shortcut">Ctrl+U</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyStrikethrough(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <path d="M17.5 6.5C17.5 4.5 15.5 3 12 3S6 4.5 6 7c0 2 1.5 3 3.5 3.5"/>
+            <path d="M6.5 17.5C6.5 19.5 8.5 21 12 21s6-1.5 6-4c0-2-1.5-3-3.5-3.5"/>
+          </svg>
+          Barré <span class="ctx-shortcut">Ctrl+⇧+X</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applySmallCaps(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <text x="1"  y="18" font-size="16" font-family="Georgia,serif" fill="currentColor" stroke="none">A</text>
+            <text x="13" y="18" font-size="11" font-family="Georgia,serif" fill="currentColor" stroke="none">A</text>
+          </svg>
+          Petites capitales <span class="ctx-shortcut">Ctrl+⇧+K</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="ctxToggleCase()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <text x="1"  y="17" font-size="14" font-family="Georgia,serif" fill="currentColor" stroke="none" font-weight="bold">A</text>
+            <text x="13" y="17" font-size="10" font-family="Georgia,serif" fill="currentColor" stroke="none">a</text>
+          </svg>
+          Basculer Maj/min
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="clearFormatting(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 6l12 12M4 19h16"/><path d="M8 4h12l-4 6H8z"/>
+          </svg>
+          Effacer le formatage <span class="ctx-shortcut">Ctrl+⇧+E</span>
+        </button>
+
+        <div class="ctx-group-title">Couleur</div>
+        <div class="ctx-inline-colors">
+          <div class="ctx-colors-label">Surbrillance</div>
+          <div class="ctx-color-row">
+            <button class="ctx-color-swatch ctx-color-none" title="Aucune" onmousedown="event.preventDefault()" onclick="applyHighlight(null); hideContextMenu()">✕</button>
+            <button class="ctx-color-swatch" title="Jaune"      style="background:Yellow"      onmousedown="event.preventDefault()" onclick="applyHighlight('Yellow');      hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Orange"     style="background:Orange"      onmousedown="event.preventDefault()" onclick="applyHighlight('Orange');      hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Vert clair" style="background:LightGreen"  onmousedown="event.preventDefault()" onclick="applyHighlight('LightGreen');  hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Cyan"       style="background:Cyan"        onmousedown="event.preventDefault()" onclick="applyHighlight('Cyan');        hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Rose"       style="background:LightPink"   onmousedown="event.preventDefault()" onclick="applyHighlight('LightPink');   hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Lavande"    style="background:Lavender"    onmousedown="event.preventDefault()" onclick="applyHighlight('Lavender');    hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Saumon"     style="background:LightSalmon" onmousedown="event.preventDefault()" onclick="applyHighlight('LightSalmon'); hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu ciel"  style="background:SkyBlue"     onmousedown="event.preventDefault()" onclick="applyHighlight('SkyBlue');     hideContextMenu()"></button>
+          </div>
+          <div class="ctx-colors-sep"></div>
+          <div class="ctx-colors-label">Couleur du texte</div>
+          <div class="ctx-color-row">
+            <button class="ctx-color-swatch ctx-color-none" title="Aucune" onmousedown="event.preventDefault()" onclick="applyTextColor(null); hideContextMenu()">✕</button>
+            <button class="ctx-color-swatch" title="Noir"       style="background:Black"       onmousedown="event.preventDefault()" onclick="applyTextColor('Black');       hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Rouge"      style="background:Crimson"     onmousedown="event.preventDefault()" onclick="applyTextColor('Crimson');     hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu"       style="background:RoyalBlue"   onmousedown="event.preventDefault()" onclick="applyTextColor('RoyalBlue');   hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Vert"       style="background:ForestGreen" onmousedown="event.preventDefault()" onclick="applyTextColor('ForestGreen'); hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Violet"     style="background:Purple"      onmousedown="event.preventDefault()" onclick="applyTextColor('Purple');      hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Olive"      style="background:Olive"       onmousedown="event.preventDefault()" onclick="applyTextColor('Olive');       hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu-vert"  style="background:Teal"        onmousedown="event.preventDefault()" onclick="applyTextColor('Teal');        hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Orange"     style="background:DarkOrange"  onmousedown="event.preventDefault()" onclick="applyTextColor('DarkOrange');  hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Gris"       style="background:DimGray"     onmousedown="event.preventDefault()" onclick="applyTextColor('DimGray');     hideContextMenu()"></button>
+            <button class="ctx-color-swatch" title="Bleu acier" style="background:SteelBlue"   onmousedown="event.preventDefault()" onclick="applyTextColor('SteelBlue');   hideContextMenu()"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 3 : Structure + Titres + Listes ──────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Structure</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="insertEmptyParaAbove(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="3" x2="12" y2="10"/>
+            <polyline points="8 7 12 3 16 7"/>
+            <line x1="4" y1="14" x2="20" y2="14" stroke-width="1.5" stroke-dasharray="3 2"/>
+            <line x1="4" y1="18" x2="16" y2="18" stroke-width="1.5" opacity="0.5"/>
+            <line x1="4" y1="21" x2="12" y2="21" stroke-width="1.5" opacity="0.3"/>
+          </svg>
+          Paragraphe vide au-dessus <span class="ctx-shortcut">Ctrl+⇧+↵</span>
+        </button>
+
+        <div class="ctx-group-title">Titre</div>
+        <div class="ctx-heading-chips">
+          <button class="ctx-heading-chip ctx-hchip-0" onmousedown="event.preventDefault()" onclick="applyHeading(0); hideContextMenu()" title="Paragraphe — Ctrl+0">¶</button>
+          <button class="ctx-heading-chip ctx-hchip-1" onmousedown="event.preventDefault()" onclick="applyHeading(1); hideContextMenu()" title="Titre 1 — Ctrl+1">H1</button>
+          <button class="ctx-heading-chip ctx-hchip-2" onmousedown="event.preventDefault()" onclick="applyHeading(2); hideContextMenu()" title="Titre 2 — Ctrl+2">H2</button>
+          <button class="ctx-heading-chip ctx-hchip-3" onmousedown="event.preventDefault()" onclick="applyHeading(3); hideContextMenu()" title="Titre 3 — Ctrl+3">H3</button>
+          <button class="ctx-heading-chip ctx-hchip-4" onmousedown="event.preventDefault()" onclick="applyHeading(4); hideContextMenu()" title="Titre 4 — Ctrl+4">H4</button>
+          <button class="ctx-heading-chip ctx-hchip-5" onmousedown="event.preventDefault()" onclick="applyHeading(5); hideContextMenu()" title="Titre 5 — Ctrl+5">H5</button>
+          <button class="ctx-heading-chip ctx-hchip-6" onmousedown="event.preventDefault()" onclick="applyHeading(6); hideContextMenu()" title="Titre 6 — Ctrl+6">H6</button>
+        </div>
+
+        <div class="ctx-group-title">Listes</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyOrderedList(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="10" y1="6"  x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
+            <text x="1" y="8"  font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">1.</text>
+            <text x="1" y="14" font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">2.</text>
+            <text x="1" y="20" font-size="6" font-family="sans-serif" fill="currentColor" stroke="none">3.</text>
+          </svg>
+          Liste numérotée <span class="ctx-shortcut">Ctrl+⇧+O</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyBulletList(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="9" y1="6"  x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/>
+            <circle cx="4" cy="6"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+          Liste à puces <span class="ctx-shortcut">Ctrl+⇧+L</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyCheckboxList(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="5" height="5" rx="1"/>
+            <polyline points="4.2 6.5 5.2 7.8 7.5 5" stroke-width="1.8"/>
+            <rect x="3" y="10" width="5" height="5" rx="1"/>
+            <rect x="3" y="16" width="5" height="5" rx="1"/>
+            <line x1="11" y1="6.5"  x2="21" y2="6.5"/>
+            <line x1="11" y1="12.5" x2="21" y2="12.5"/>
+            <line x1="11" y1="18.5" x2="21" y2="18.5"/>
+          </svg>
+          Liste à cocher <span class="ctx-shortcut">Ctrl+⇧+F</span>
+        </button>
+        <button class="ctx-item" id="ctx-tight-list" onmousedown="event.preventDefault()" onclick="ctxToggleTightList(); hideContextMenu()" style="display:none" title="Ctrl+Shift+P">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="9" y1="5"  x2="20" y2="5"/><line x1="9" y1="9"  x2="20" y2="9"/>
+            <line x1="9" y1="13" x2="20" y2="13"/><line x1="9" y1="17" x2="20" y2="17"/>
+            <circle cx="4" cy="5"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="9"  r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="13" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4" cy="17" r="1.5" fill="currentColor" stroke="none"/>
+          </svg>
+          <span id="ctx-tight-label">Liste serrée</span>
+          <span class="ctx-shortcut">Ctrl+⇧+P</span>
+        </button>
+        <button class="ctx-item" id="ctx-list-start" onmousedown="event.preventDefault()" onclick="openListStartDialog(); hideContextMenu()" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="10" y1="6"  x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
+            <text x="1" y="8"  font-size="7" font-family="sans-serif" fill="currentColor" stroke="none">N</text>
+          </svg>
+          Numéro de départ…
+        </button>
+      </div>
+
+      <div class="ctx-col-divider"></div>
+
+      <!-- ── Colonne 4 : Blocs + Insertion ─────────────────────────────────────── -->
+      <div class="ctx-col">
+        <div class="ctx-section-title">Blocs</div>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyBlockquote(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="4" x2="3" y2="20" stroke-width="3"/>
+            <line x1="7" y1="8"  x2="21" y2="8"/><line x1="7" y1="12" x2="18" y2="12"/><line x1="7" y1="16" x2="20" y2="16"/>
+          </svg>
+          Citation <span class="ctx-shortcut">Ctrl+⇧+Q</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyHorizontalRule(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12" stroke-width="2.5"/>
+            <line x1="3" y1="7"  x2="7"  y2="7"  stroke-width="1.5"/><line x1="3" y1="17" x2="7"  y2="17" stroke-width="1.5"/>
+          </svg>
+          Ligne horizontale <span class="ctx-shortcut">Ctrl+⇧+R</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyCodeBlock(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="18" rx="2"/>
+            <line x1="6"  y1="9"  x2="10" y2="12"/><line x1="6"  y1="15" x2="10" y2="12"/>
+            <line x1="14" y1="9"  x2="18" y2="12"/><line x1="14" y1="15" x2="18" y2="12"/>
+          </svg>
+          Bloc de code <span class="ctx-shortcut">Ctrl+⇧+C</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyYamlBlock(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="6"  x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/>
+            <text x="6" y="14.5" font-size="6" font-family="monospace" fill="currentColor" stroke="none">YAML</text>
+          </svg>
+          Bloc YAML <span class="ctx-shortcut">Ctrl+⇧+Y</span>
+        </button>
+
+        <div class="ctx-group-title">Insertion</div>
+        <button class="ctx-item" onclick="applyImage(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          Image <span class="ctx-shortcut">Ctrl+⇧+I</span>
+        </button>
+        <button class="ctx-item" onclick="applyTable(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3"  y1="9"  x2="21" y2="9"/><line x1="3"  y1="15" x2="21" y2="15"/>
+            <line x1="9"  y1="3"  x2="9"  y2="21"/><line x1="15" y1="3"  x2="15" y2="21"/>
+          </svg>
+          Tableau <span class="ctx-shortcut">Ctrl+⇧+T</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyFencedDiv(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="5" width="20" height="14" rx="2" stroke-dasharray="4 2.5"/>
+            <text x="12" y="15" text-anchor="middle" font-size="7" font-family="monospace" fill="currentColor" stroke="none" font-weight="bold">div</text>
+          </svg>
+          DIV conditionnelle <span class="ctx-shortcut">Ctrl+⇧+D</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="openRawHtmlDialog(null); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <polyline points="4 9 2 12 4 15"/><polyline points="20 9 22 12 20 15"/>
+            <line x1="12" y1="5" x2="12" y2="19" stroke-dasharray="3 2"/>
+          </svg>
+          HTML brut
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="insertHtmlComment(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <line x1="3" y1="7" x2="3" y2="17" stroke-width="2.5"/><line x1="21" y1="7" x2="21" y2="17" stroke-width="2.5"/>
+            <line x1="7" y1="12" x2="17" y2="12" stroke-dasharray="2.5 2"/>
+          </svg>
+          Commentaire HTML
+        </button>
+        <button class="ctx-item ctx-item--todo" onmousedown="event.preventDefault()" onclick="insertTodoComment(); hideContextMenu()">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="1" y="1" width="12" height="12" rx="2"/>
+          </svg>
+          TODO <span class="ctx-shortcut">Ctrl+⇧+A</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="openSCDialog(null); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <text x="1" y="15" font-size="9" font-family="monospace" fill="currentColor" stroke="none" font-weight="bold">{{&lt;</text>
+            <text x="1" y="22" font-size="9" font-family="monospace" fill="currentColor" stroke="none" font-weight="bold">&gt;}}</text>
+          </svg>
+          Shortcode <span class="ctx-shortcut">Ctrl+⇧+H</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="applyFootnote(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="20" x2="20" y2="20"/>
+            <text x="3" y="15" font-size="9" font-family="serif" fill="currentColor" stroke="none">¹</text>
+            <line x1="10" y1="5" x2="10" y2="16" stroke-width="1.5"/><line x1="6"  y1="9" x2="14" y2="9" stroke-width="1.5"/>
+          </svg>
+          Note de bas de page <span class="ctx-shortcut">Ctrl+⇧+N</span>
+        </button>
+      </div>
+
+    </div><!-- .ctx-body -->
+
+  </div>
+  <!-- ── Menu contextuel shortcode ───────────────────────────────────────── -->
+  <div id="sc-context-menu">
+    <button class="ctx-item" onclick="editSCFromMenu(); hideSCContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Modifier…
+    </button>
+    <div id="sc-ctx-include-sep" class="ctx-separator" style="display:none"></div>
+    <button id="sc-ctx-include-open" class="ctx-item" style="display:none" onclick="openIncludeFileFromMenu(); hideSCContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Ouvrir dans un onglet
+    </button>
+    <button class="ctx-item ctx-danger" onclick="deleteSCFromMenu(); hideSCContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+      </svg>
+      Supprimer
+    </button>
+  </div>
+
+  <!-- ── Menu contextuel commentaire HTML ────────────────────────────────── -->
+  <div id="comment-context-menu">
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="commentCtxCopy(); hideCommentContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier <span class="ctx-shortcut">Ctrl+C</span>
+    </button>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="commentCtxCut(); hideCommentContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="6" cy="20" r="3"/><circle cx="18" cy="20" r="3"/>
+        <line x1="5.27" y1="3" x2="19" y2="21"/>
+        <line x1="18.73" y1="3" x2="5" y2="21"/>
+      </svg>
+      Couper <span class="ctx-shortcut">Ctrl+X</span>
+    </button>
+    <button class="ctx-item" onmousedown="event.preventDefault()" onclick="commentCtxPaste()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+        <rect x="8" y="2" width="8" height="4" rx="1"/>
+      </svg>
+      Coller <span class="ctx-shortcut">Ctrl+V</span>
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item" onclick="editCommentFromMenu(); hideCommentContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Modifier…
+    </button>
+    <button class="ctx-item ctx-danger" onclick="deleteCommentFromMenu(); hideCommentContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+      </svg>
+      Supprimer
+    </button>
+  </div>
+
+  <!-- ── Dialogue Signet ──────────────────────────────────────────────────── -->
+  <div id="bookmark-overlay" onclick="closeBookmarkDialog(event)">
+    <div id="bookmark-dialog">
+      <div class="settings-header">
+        <h2 id="bookmark-dialog-title">Définir un signet</h2>
+        <button class="settings-close" onclick="closeBookmarkDialog()">×</button>
+      </div>
+      <div id="bookmark-body">
+        <div class="link-field">
+          <label class="link-field-label">Identifiant <span style="font-weight:400;text-transform:none;letter-spacing:0">(sans espace)</span></label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-family:var(--font-code);color:var(--text-muted);font-size:15px">#</span>
+            <input id="bookmark-id-input" type="text" class="link-input"
+                   placeholder="mon-signet"
+                   pattern="[\w-]+"
+                   oninput="this.value=this.value.replace(/\s/g,'-')"
+                   onkeydown="if(event.key==='Enter')confirmBookmarkDialog()">
+          </div>
+        </div>
+        <p class="rh-hint">Code généré : <code id="bookmark-preview">#mon-signet</code> — utiliser dans un lien avec <code>#identifiant</code></p>
+      </div>
+      <div class="settings-footer">
+        <button id="bookmark-remove-btn" class="settings-btn settings-btn-danger" onclick="removeBookmark()" style="display:none">Supprimer</button>
+        <button class="settings-btn settings-btn-cancel" onclick="closeBookmarkDialog()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="confirmBookmarkDialog()">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dialogue Raw HTML ────────────────────────────────────────────────── -->
+  <div id="rh-overlay" onclick="closeRawHtmlDialog(event)">
+    <div id="rh-dialog">
+      <div class="settings-header">
+        <h2 id="rh-dialog-title">Insérer un bloc HTML</h2>
+        <button class="settings-close" onclick="closeRawHtmlDialog()">×</button>
+      </div>
+      <div id="rh-body">
+        <div class="link-field">
+          <label class="link-field-label">Code HTML</label>
+          <textarea id="rh-code" class="rh-textarea" placeholder="<p>Contenu HTML...</p>" spellcheck="false"></textarea>
+        </div>
+        <div class="rh-hint">Le code sera rendu directement dans la prévisualisation et stocké en <code>```{=html}</code> dans le Markdown.</div>
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeRawHtmlDialog()">Annuler</button>
+        <button id="rh-confirm-btn" class="settings-btn settings-btn-confirm" onclick="confirmRawHtmlDialog()">Insérer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Menu contextuel Raw HTML ──────────────────────────────────────────── -->
+  <div id="rh-context-menu">
+    <button class="ctx-item" onclick="editRawHtmlFromMenu(); hideRawHtmlContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Modifier le bloc HTML…
+    </button>
+    <button class="ctx-item ctx-danger" onclick="deleteRawHtmlFromMenu(); hideRawHtmlContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/>
+      </svg>
+      Supprimer le bloc HTML
+    </button>
+  </div>
+
+  <!-- ── Dialogue Shortcode ────────────────────────────────────────────────── -->
+  <div id="sc-overlay" onclick="closeSCDialog(event)">
+    <div id="sc-dialog">
+      <div class="settings-header">
+        <h2 id="sc-dialog-title">Insérer un shortcode</h2>
+        <button class="settings-close" onclick="closeSCDialog()">×</button>
+      </div>
+      <div id="sc-body">
+        <div class="link-field">
+          <label class="link-field-label">Nom du shortcode</label>
+          <input id="sc-name" type="text" class="link-input" list="sc-datalist" placeholder="pagebreak">
+          <datalist id="sc-datalist">
+            <option value="pagebreak">
+            <option value="video">
+            <option value="include">
+            <option value="kbd">
+            <option value="meta">
+            <option value="fa">
+            <option value="lipsum">
+            <option value="revealjs-fragments">
+          </datalist>
+        </div>
+        <div class="link-field" id="sc-args-row">
+          <label class="link-field-label">Arguments <span style="font-weight:400;text-transform:none;letter-spacing:0">(optionnel)</span></label>
+          <input id="sc-args" type="text" class="link-input" placeholder='url="https://…" width="100%"'>
+        </div>
+        <!-- Zone spécifique au shortcode "include" -->
+        <div class="link-field" id="sc-include-row" style="display:none">
+          <label class="link-field-label">Fichier à inclure</label>
+          <div class="sc-file-row">
+            <input id="sc-include-path" type="text" class="link-input sc-include-input"
+                   placeholder="_fichier.md" readonly
+                   title="Chemin relatif au répertoire projet">
+            <button class="sc-browse-btn" onclick="_scBrowseInclude()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              Parcourir…
+            </button>
+          </div>
+        </div>
+        <div class="link-preview-row">
+          <span class="link-field-label">Code généré</span>
+          <code id="sc-preview" class="link-preview-code"></code>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeSCDialog()">Annuler</button>
+        <button id="sc-confirm-btn" class="settings-btn settings-btn-confirm" onclick="confirmSCDialog()">Insérer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Menu contextuel note de bas de page ──────────────────────────────── -->
+  <div id="footnote-context-menu">
+    <button class="ctx-item" onclick="editFootnoteFromMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 1 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Modifier la note…
+    </button>
+    <div class="ctx-separator"></div>
+    <button class="ctx-item ctx-danger" onclick="deleteFootnoteFromMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+      Supprimer la note
+    </button>
+  </div>
+
+  <!-- ── Menu contextuel lien ─────────────────────────────────────────────── -->
+  <div id="link-context-menu">
+    <button id="link-ctx-open" class="ctx-item" style="display:none"
+            onclick="openLinkFileFromMenu(); hideLinkContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      Ouvrir dans un onglet
+    </button>
+    <div id="link-ctx-open-sep" class="ctx-separator" style="display:none"></div>
+    <button class="ctx-item" onclick="copyLinkFromMenu(); hideLinkContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier le lien
+    </button>
+    <button class="ctx-item" onclick="editLinkFromMenu(); hideLinkContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+      Modifier le lien…
+    </button>
+    <button class="ctx-item ctx-danger" onclick="deleteLinkFromMenu(); hideLinkContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        <line x1="4" y1="4" x2="20" y2="20"/>
+      </svg>
+      Supprimer le lien
+    </button>
+  </div>
+
+  <!-- ── Dialogue Lien ─────────────────────────────────────────────────────── -->
+  <div id="link-overlay" onclick="closeLinkDialog(event)">
+    <div id="link-dialog">
+
+      <div class="settings-header">
+        <h2 id="link-dialog-title">Insérer un lien</h2>
+        <button class="settings-close" onclick="closeLinkDialog()">×</button>
+      </div>
+
+      <div id="link-dialog-body">
+
+        <!-- Texte du lien -->
+        <div class="link-field">
+          <label class="link-field-label">Texte du lien</label>
+          <input id="link-text" type="text" class="link-input" placeholder="Texte affiché">
+        </div>
+
+        <!-- Type de lien -->
+        <div class="link-field">
+          <label class="link-field-label">Type de destination</label>
+          <div class="link-type-group">
+            <button id="link-type-url"     class="link-type-btn active" onclick="selectLinkType('url')">URL</button>
+            <button id="link-type-file"    class="link-type-btn"        onclick="selectLinkType('file')">Fichier</button>
+            <button id="link-type-id"      class="link-type-btn"        onclick="selectLinkType('id')">ID</button>
+            <button id="link-type-heading" class="link-type-btn"        onclick="selectLinkType('heading')">Titre du document</button>
+          </div>
+        </div>
+
+        <!-- Sélection fichier -->
+        <div id="link-file-row" class="link-field" style="display:none">
+          <label class="link-field-label">Fichier</label>
+          <div class="link-file-wrap">
+            <span id="link-file-path" class="link-file-name">—</span>
+            <button class="settings-btn" onclick="browseLinkFile()">Parcourir…</button>
+          </div>
+        </div>
+
+        <!-- Saisie URL -->
+        <div id="link-url-row" class="link-field">
+          <label class="link-field-label">Adresse URL</label>
+          <input id="link-url" type="text" class="link-input" placeholder="https://…">
+        </div>
+
+        <!-- Saisie ID -->
+        <div id="link-id-row" class="link-field" style="display:none">
+          <label class="link-field-label">Identifiant d'ancre</label>
+          <div class="link-id-wrap">
+            <span class="link-id-hash">#</span>
+            <input id="link-id" type="text" class="link-input" placeholder="mon-identifiant">
+          </div>
+          <div id="link-bookmark-row" style="margin-top:6px">
+            <label class="link-field-label" style="font-size:11px;opacity:.75">Signets du document</label>
+            <select id="link-bookmark-select" class="link-select"
+                    onchange="document.getElementById('link-id').value=this.value; _updateLinkPreview()">
+            </select>
+          </div>
+        </div>
+
+        <!-- Sélection titre -->
+        <div id="link-heading-row" class="link-field" style="display:none">
+          <label class="link-field-label">Titre cible</label>
+          <select id="link-heading-select" class="link-select"></select>
+        </div>
+
+        <!-- Aperçu -->
+        <div class="link-preview-row">
+          <span class="link-field-label">Aperçu markdown</span>
+          <code id="link-preview" class="link-preview-code"></code>
+        </div>
+
+      </div>
+
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel"  onclick="closeLinkDialog()">Annuler</button>
+        <button id="link-confirm-btn" class="settings-btn settings-btn-confirm" onclick="confirmLinkDialog()">Insérer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dialogue Note de bas de page ─────────────────────────────────────── -->
+  <div id="footnote-overlay" onclick="if(event.target===this)cancelFootnoteDialog()">
+    <div id="footnote-dialog">
+      <div class="settings-header">
+        <h2 id="footnote-dialog-title">Note de bas de page</h2>
+        <button class="settings-close" onclick="cancelFootnoteDialog()">×</button>
+      </div>
+
+      <!-- Mini barre de formatage -->
+      <div class="fn-toolbar">
+        <button class="fn-tool-btn" title="Gras (Ctrl+B)" onclick="_fnFormat('bold')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+          <span>Gras</span>
+        </button>
+        <button class="fn-tool-btn" title="Italique (Ctrl+I)" onclick="_fnFormat('italic')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+          <span>Italique</span>
+        </button>
+        <button class="fn-tool-btn" title="Code inline" onclick="_fnFormat('code')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Code</span>
+        </button>
+        <div class="fn-tool-sep"></div>
+        <button class="fn-tool-btn" title="Lien" onclick="_fnFormat('link')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span>Lien</span>
+        </button>
+        <div class="fn-tool-sep"></div>
+        <button class="fn-tool-btn" title="Liste à puces" onclick="_fnFormat('ul')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
+          <span>Puces</span>
+        </button>
+        <button class="fn-tool-btn" title="Liste numérotée" onclick="_fnFormat('ol')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke-linecap="round"/><path d="M4 10h2" stroke-linecap="round"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-linecap="round"/></svg>
+          <span>Numéros</span>
+        </button>
+        <div class="fn-tool-sep"></div>
+        <button class="fn-tool-btn fn-tool-btn--kbd" title="Ctrl+B" onclick="_fnFormat('bold')"><kbd>Ctrl</kbd><kbd>B</kbd></button>
+        <button class="fn-tool-btn fn-tool-btn--kbd" title="Ctrl+I" onclick="_fnFormat('italic')"><kbd>Ctrl</kbd><kbd>I</kbd></button>
+      </div>
+
+      <!-- Zone de saisie -->
+      <div class="fn-editor-wrap">
+        <textarea id="footnote-text-input" class="fn-editor"
+          placeholder="Texte de la note — le markdown est supporté : **gras**, *italique*, \`code\`, [lien](url)…"
+          onkeydown="_fnKeydown(event)"></textarea>
+      </div>
+
+      <!-- Prévisualisation rendue -->
+      <div class="fn-preview-wrap">
+        <span class="fn-preview-label">Aperçu</span>
+        <div id="footnote-preview" class="fn-preview"></div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="cancelFootnoteDialog()">Annuler</button>
+        <button id="footnote-confirm-btn" class="settings-btn settings-btn-confirm" onclick="confirmFootnoteDialog()">Insérer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popover survol note de bas de page -->
+  <div id="footnote-tooltip">
+    <div class="fn-tooltip-header">
+      <span class="fn-tooltip-num" id="fn-tooltip-num"></span>
+      <span class="fn-tooltip-label">Note de bas de page</span>
+    </div>
+    <div class="fn-tooltip-body" id="fn-tooltip-body"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Encart markdown au survol du label DIV -->
+  <div id="fdiv-md-tooltip">
+    <div class="fdiv-tooltip-header">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1" y="3" width="10" height="10" rx="1.5" stroke-dasharray="3 1.5"/>
+        <text x="3" y="11" font-size="6" font-family="monospace" fill="currentColor" stroke="none" font-weight="bold">:::</text>
+      </svg>
+      Markdown
+    </div>
+    <pre class="fdiv-tooltip-code"></pre>
+  </div>
+
+  <!-- Modale README -->
+  <div id="readme-overlay" onclick="closeReadmeOnOverlay(event)">
+    <div id="readme-panel">
+      <div class="settings-header">
+        <h2>README</h2>
+        <button class="settings-close" onclick="closeReadme()">×</button>
+      </div>
+      <div id="readme-content"></div>
+    </div>
+  </div>
+
+  <!-- Dialogue numéro de départ de liste numérotée -->
+  <div id="list-start-overlay" onclick="closeListStartDialog(event)">
+    <div id="list-start-dialog">
+      <div class="settings-header">
+        <h2>Numéro de départ</h2>
+        <button class="settings-close" onclick="closeListStartDialog()">×</button>
+      </div>
+      <div class="list-start-body">
+        <label class="list-start-label">Premier numéro de la liste</label>
+        <input type="number" id="list-start-input" min="0" value="1"
+               onkeydown="if(event.key==='Enter') applyListStart()">
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-cancel" onclick="closeListStartDialog()">Annuler</button>
+        <button class="settings-btn settings-btn-confirm" onclick="applyListStart()">Appliquer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fenêtre d'aide / raccourcis ──────────────────────────────────────── -->
+  <div id="help-overlay" onclick="closeHelpDialog(event)">
+    <div id="help-dialog">
+      <div class="settings-header">
+        <h2>Aide — Raccourcis clavier</h2>
+        <button class="settings-close" onclick="closeHelpDialog()">×</button>
+      </div>
+      <div id="help-body">
+
+        <div class="help-section">
+          <div class="help-section-title">Fichiers &amp; Onglets</div>
+          <div class="help-row"><kbd>Ctrl+O</kbd><span>Ouvrir un fichier</span></div>
+          <div class="help-row"><kbd>Ctrl+S</kbd><span>Enregistrer</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+S</kbd><span>Enregistrer sous…</span></div>
+          <div class="help-row"><kbd>Ctrl+W</kbd><span>Fermer l'onglet courant</span></div>
+          <div class="help-row"><kbd>Ctrl+T</kbd><span>Nouvel onglet</span></div>
+          <div class="help-row"><kbd>Ctrl+Tab</kbd><span>Onglet suivant</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+Tab</kbd><span>Onglet précédent</span></div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-section-title">Affichage</div>
+          <div class="help-row"><kbd>Ctrl+Shift+M</kbd><span>Basculer source / prévisualisation</span></div>
+          <div class="help-row"><kbd>Ctrl+Alt+←</kbd><span>Afficher / réduire le volet gauche</span></div>
+          <div class="help-row"><kbd>Ctrl+Alt+→</kbd><span>Afficher / réduire le volet droit</span></div>
+          <div class="help-row"><kbd>Ctrl+F</kbd><span>Rechercher</span></div>
+          <div class="help-row"><kbd>F3</kbd><span>Occurrence suivante</span></div>
+          <div class="help-row"><kbd>Shift+F3</kbd><span>Occurrence précédente</span></div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-section-title">Mise en forme du texte</div>
+          <div class="help-row"><kbd>Ctrl+B</kbd><span>Gras</span></div>
+          <div class="help-row"><kbd>Ctrl+I</kbd><span>Italique</span></div>
+          <div class="help-row"><kbd>Ctrl+U</kbd><span>Souligné</span></div>
+          <div class="help-row"><kbd>Ctrl+E</kbd><span>Code inline</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+X</kbd><span>Barré</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+K</kbd><span>Petites majuscules</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+E</kbd><span>Effacer le formatage</span></div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-section-title">Titres</div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+0</kbd><span>Paragraphe (supprimer le titre)</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+1</kbd><span>Titre H1</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+2</kbd><span>Titre H2</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+3</kbd><span>Titre H3</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+4</kbd><span>Titre H4</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+5</kbd><span>Titre H5</span></div>
+          <div class="help-row"><kbd>Ctrl+(Shift)+6</kbd><span>Titre H6</span></div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-section-title">Blocs &amp; Structures</div>
+          <div class="help-row"><kbd>Ctrl+Shift+L</kbd><span>Liste à puces</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+O</kbd><span>Liste numérotée</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+P</kbd><span>Basculer liste serrée / espacée</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+C</kbd><span>Bloc de code</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+Y</kbd><span>Bloc YAML</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+Q</kbd><span>Citation</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+T</kbd><span>Tableau</span></div>
+          <div class="help-row"><kbd>Ctrl+K</kbd><span>Insérer un lien</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+B</kbd><span>Ajouter / modifier un signet sur le titre</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+V</kbd><span>Coller sans format</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+I</kbd><span>Insérer une image</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+D</kbd><span>Insérer une DIV conditionnelle</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+H</kbd><span>Insérer un shortcode</span></div>
+          <div class="help-row"><kbd>Ctrl+Enter</kbd><span>Insérer un saut de page</span></div>
+          <div class="help-row"><kbd>Ctrl+Shift+Entrée</kbd><span>Insérer un paragraphe vide au-dessus</span></div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-section-title">Aide</div>
+          <div class="help-row"><kbd>Échap × 2</kbd><span>Afficher cette fenêtre d'aide</span></div>
+        </div>
+
+      </div>
+      <div class="settings-footer">
+        <button class="settings-btn settings-btn-confirm" onclick="closeHelpDialog()">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Panneau TODO ─────────────────────────────────────────────────────── -->
+  <div id="todo-overlay">
+    <div id="todo-dialog">
+      <div class="todo-header">
+        <span class="todo-title">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="15" height="15" style="vertical-align:-2px;margin-right:6px">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="2"/>
+            <polyline points="4.5,5.5 6,7 8.5,4"/>
+            <line x1="10" y1="5.5" x2="13.5" y2="5.5"/>
+            <polyline points="4.5,9.5 6,11 8.5,8.5"/>
+            <line x1="10" y1="9.5" x2="13.5" y2="9.5"/>
+          </svg>
+          Tâches TODO
+        </span>
+        <div class="todo-header-actions">
+          <button class="todo-filter-btn active" id="todo-filter-all" onclick="todoSetFilter('all')">Toutes</button>
+          <button class="todo-filter-btn" id="todo-filter-todo" onclick="todoSetFilter('todo')">À faire</button>
+          <button class="todo-filter-btn" id="todo-filter-done" onclick="todoSetFilter('done')">Faites</button>
+          <button class="todo-close-btn" onclick="closeTodoPanel()" title="Fermer">×</button>
+        </div>
+      </div>
+      <div id="todo-list-container"></div>
+      <div class="todo-footer">
+        <span id="todo-counter"></span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="todo-scan-btn" id="todo-scan-btn" onclick="todoScanDirectory()" title="Scanner les *.md et *.qmd du répertoire courant">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" width="12" height="12">
+              <circle cx="6.5" cy="6.5" r="4.5"/>
+              <line x1="10" y1="10" x2="14" y2="14"/>
+              <line x1="6.5" y1="4" x2="6.5" y2="9"/>
+              <line x1="4" y1="6.5" x2="9" y2="6.5"/>
+            </svg>
+            Scanner répertoire
+          </button>
+          <button class="todo-clear-btn" onclick="todoClearDone()">Effacer les faites</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup autocomplete citations BibTeX -->
+  <div id="cite-popup"></div>
+
+  <!-- Tooltip référence bibliographique -->
+  <div id="citation-tooltip"></div>
+
+  <!-- Dropdown liste de tous les onglets -->
+  <div id="tabs-menu-dropdown">
+    <div id="tabs-menu-search-wrap">
+      <input id="tabs-menu-search" type="text" placeholder="Filtrer…" oninput="filterTabsMenu(this.value)">
+    </div>
+    <div id="tabs-menu-list"></div>
+  </div>
+
+  <!-- Poignée de redimensionnement de la largeur de la colonne de contenu -->
+  <div id="preview-width-handle" title="Élargir / réduire la colonne — Maj+molette&#10;Double-clic : réinitialiser"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
