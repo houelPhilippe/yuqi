@@ -25,6 +25,23 @@ const _HIGHLIGHT_COLORS = {
   'SkyBlue':     'rgba(30,144,255,0.35)',
 };
 
+// ── Commentaires (annotations liées à une sélection, façon Word) ────────────────
+// Encodage markdown : [texte sélectionné]{.comment comment-id="..." comment-text="..."}
+// comment-text échappe \, " et les retours à la ligne pour tenir sur un attribut markdown.
+function _annotEscape(s) {
+  return (s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, '\\n');
+}
+function _annotUnescape(s) {
+  return (s || '').replace(/\\(.)/g, (_, c) => c === 'n' ? '\n' : c);
+}
+// Échappement HTML dédié pour l'attribut data-annot-text (indépendant de _escHtml).
+function _annotHtmlEscape(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function _newAnnotId() {
+  return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
 // ── Grid table helpers ─────────────────────────────────────────────────────────
 // Retourne string[][] : un tableau de lignes par colonne
 function parseCells(lines, colBounds, numCols) {
@@ -630,6 +647,37 @@ function init() {
           return `<span class="md-textcolor" style="color:${token.color}" data-color="${token.color}">${this.parser.parseInline(token.tokens)}</span>`;
         }
       },
+      {
+        name: 'annotation',
+        level: 'inline',
+        start(src) { return src.indexOf('['); },
+        tokenizer(src) {
+          if (src[0] !== '[') return;
+          let depth = 0, i = 0;
+          for (; i < src.length; i++) {
+            if (src[i] === '[') depth++;
+            else if (src[i] === ']') { if (--depth === 0) break; }
+          }
+          if (depth !== 0) return;
+          const text = src.slice(1, i);
+          const attrMatch = src.slice(i + 1).match(/^\{\.comment comment-id="([^"]*)" comment-text="((?:\\.|[^"\\])*)"\}/);
+          if (!attrMatch) return;
+          const token = {
+            type: 'annotation',
+            raw: src.slice(0, i + 1) + attrMatch[0],
+            text,
+            annotId:   attrMatch[1],
+            annotText: _annotUnescape(attrMatch[2]),
+            tokens: [],
+          };
+          this.lexer.inline(token.text, token.tokens);
+          return token;
+        },
+        renderer(token) {
+          const safeText = _annotHtmlEscape(token.annotText);
+          return `<span class="md-annotation" data-annot-id="${token.annotId}" data-annot-text="${safeText}">${this.parser.parseInline(token.tokens)}</span>`;
+        }
+      },
       // ── Note de bas de page (bloc) : [^label]: texte ──────────────────────
       {
         name: 'footnoteDef',
@@ -783,6 +831,15 @@ function init() {
     replacement: (content, node) => {
       const color = node.getAttribute('data-color') || node.style.color || 'Black';
       return `[${content}]{style="color: ${color};"}`;
+    }
+  });
+
+  turndown.addRule('annotation', {
+    filter: node => node.nodeName === 'SPAN' && node.classList.contains('md-annotation'),
+    replacement: (content, node) => {
+      const id   = node.getAttribute('data-annot-id')   || '';
+      const text = node.getAttribute('data-annot-text') || '';
+      return `[${content}]{.comment comment-id="${id}" comment-text="${_annotEscape(text)}"}`;
     }
   });
 
@@ -1132,6 +1189,22 @@ function init() {
   });
   document.addEventListener('click', () => hideCommentContextMenu());
 
+  // Commentaire (annotation) : clic sur le texte surligné → mettre en évidence
+  // la carte correspondante dans le panneau « Commentaires » du volet droit.
+  document.getElementById('preview').addEventListener('click', e => {
+    const annot = e.target.closest('.md-annotation');
+    if (!annot) return;
+    const id = annot.getAttribute('data-annot-id');
+    if (!id) return;
+    const section = document.getElementById('annotations-section');
+    if (section) section.classList.remove('collapsed');
+    const item = document.querySelector(`.annot-item[data-annot-id="${id}"]`);
+    if (!item) return;
+    item.scrollIntoView({ block: 'nearest' });
+    item.classList.add('annot-item--flash');
+    setTimeout(() => item.classList.remove('annot-item--flash'), 900);
+  });
+
   // Shortcode : clic droit + double-clic
   document.getElementById('preview').addEventListener('contextmenu', e => {
     const sc = e.target.closest('.md-shortcode');
@@ -1221,6 +1294,38 @@ function init() {
     if (!sup) return;
     clearTimeout(_fnTooltipTimer);
     fnTooltip.classList.remove('visible');
+  });
+
+  // ── Popover survol commentaire (annotation liée à une sélection) ──────────
+  const annotTooltip = document.getElementById('annot-tooltip');
+  let _annotTooltipTimer = null;
+
+  document.getElementById('preview').addEventListener('mouseover', e => {
+    const span = e.target.closest('.md-annotation');
+    if (!span) return;
+    clearTimeout(_annotTooltipTimer);
+    const text = span.getAttribute('data-annot-text') || '';
+    if (!text.trim()) return;
+
+    document.getElementById('annot-tooltip-body').textContent = text;
+
+    // Positionnement : toujours en dessous du texte surligné, centré
+    const rect = span.getBoundingClientRect();
+    const tw = Math.min(320, window.innerWidth - 16);
+    let left = rect.left + rect.width / 2 - tw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+    annotTooltip.style.width = tw + 'px';
+    annotTooltip.style.left  = left + 'px';
+    annotTooltip.style.top   = (rect.bottom + 6) + 'px';
+
+    _annotTooltipTimer = setTimeout(() => annotTooltip.classList.add('visible'), 120);
+  });
+
+  document.getElementById('preview').addEventListener('mouseout', e => {
+    const span = e.target.closest('.md-annotation');
+    if (!span) return;
+    clearTimeout(_annotTooltipTimer);
+    annotTooltip.classList.remove('visible');
   });
 
   // Clic droit sur un lien → menu contextuel dédié
@@ -1388,6 +1493,7 @@ function init() {
   // Initialiser le sommaire (droite)
   initTOCResize();
   initTocMetaResize();
+  initMetaAnnotResize();
   initTOCScrollSpy();
 
   // Initialiser la règle de tabulation
@@ -2221,6 +2327,10 @@ function renderEmpty() {
   if (sep) sep.style.display = 'none';
   const tocBody = document.getElementById('toc-body');
   if (tocBody) tocBody.innerHTML = '<div class="toc-empty">Aucun document</div>';
+  const annotBody = document.getElementById('annotations-body');
+  if (annotBody) annotBody.innerHTML = '';
+  const annotCounter = document.getElementById('annotations-counter');
+  if (annotCounter) annotCounter.textContent = '';
 }
 
 // ── Métadonnées YAML (panneau de droite) ────────────────────────────────────────
@@ -2374,6 +2484,8 @@ function toggleMetadataSection() {
   const collapsed = section.classList.toggle('collapsed');
   const handle = document.getElementById('toc-meta-resize-handle');
   if (handle) handle.classList.toggle('disabled', collapsed);
+  const metaAnnotHandle = document.getElementById('meta-annot-resize-handle');
+  if (metaAnnotHandle) metaAnnotHandle.classList.toggle('disabled', collapsed);
 }
 
 function toggleMetadataOther() {
@@ -2383,6 +2495,8 @@ function toggleMetadataOther() {
 // ── Preview ───────────────────────────────────────────────────────────────────
 // ── TOC (Sommaire) ────────────────────────────────────────────────────────────
 function updateTOC() {
+  updateAnnotationsList();
+
   const body = document.getElementById('toc-body');
   if (!body) return;
 
@@ -2665,6 +2779,45 @@ function initTocMetaResize() {
     const dy    = e.clientY - startY; // glisser vers le bas = agrandir le sommaire
     const newH  = Math.max(60, Math.min(maxH, startH - dy));
     metaSection.style.height = newH + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
+  });
+}
+
+// Redimensionnement vertical entre les sections « Métadonnées » et « Commentaires »
+// du volet de droite, via la poignée placée entre les deux.
+function initMetaAnnotResize() {
+  const handle       = document.getElementById('meta-annot-resize-handle');
+  const metaSection  = document.getElementById('metadata-section');
+  const annotSection = document.getElementById('annotations-section');
+  if (!handle || !metaSection || !annotSection) return;
+
+  let dragging = false, startY = 0, startH = 0;
+
+  handle.addEventListener('mousedown', e => {
+    if (metaSection.classList.contains('collapsed') || annotSection.classList.contains('collapsed')) return;
+    dragging = true;
+    startY   = e.clientY;
+    startH   = annotSection.offsetHeight;
+    handle.classList.add('dragging');
+    document.body.style.cursor     = 'row-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const panel = document.getElementById('toc-panel');
+    const maxH  = panel.offsetHeight - handle.offsetHeight - 120; // garder un minimum pour sommaire + métadonnées
+    const dy    = e.clientY - startY; // glisser vers le bas = agrandir les métadonnées
+    const newH  = Math.max(60, Math.min(maxH, startH - dy));
+    annotSection.style.height = newH + 'px';
   });
 
   document.addEventListener('mouseup', () => {
@@ -6035,6 +6188,151 @@ function _escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Panneau Commentaires (annotations liées à une sélection) ───────────────────
+function _collectAnnotations(content) {
+  const RE = /\[((?:[^\[\]]|\[[^\]]*\])*)\]\{\.comment comment-id="([^"]*)" comment-text="((?:\\.|[^"\\])*)"\}/g;
+  const items = [];
+  let m;
+  while ((m = RE.exec(content || '')) !== null) {
+    items.push({ id: m[2], anchorText: m[1], text: _annotUnescape(m[3]) });
+  }
+  return items;
+}
+
+function _annotAnchorPreview(raw) {
+  const plain = (raw || '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/[_~]/g, '')
+    .trim();
+  const truncated = plain.length > 90 ? plain.slice(0, 90) + '…' : plain;
+  return _annotHtmlEscape(truncated);
+}
+
+function updateAnnotationsList() {
+  const body = document.getElementById('annotations-body');
+  if (!body) return;
+
+  const tab   = getActiveTab();
+  const items = tab ? _collectAnnotations(tab.content) : [];
+
+  const counter = document.getElementById('annotations-counter');
+  if (counter) counter.textContent = items.length ? String(items.length) : '';
+
+  if (!items.length) {
+    body.innerHTML = `<div class="annot-empty">Aucun commentaire.<br>
+      <small style="opacity:.6">Sélectionnez du texte, puis « Ajouter un commentaire » dans le menu contextuel.</small></div>`;
+    return;
+  }
+
+  body.innerHTML = items.map(it => `
+    <div class="annot-item" data-annot-id="${it.id}">
+      <div class="annot-anchor" onclick="selectAnnotationAnchor('${it.id}')" title="Aller au texte sélectionné">${_annotAnchorPreview(it.anchorText)}</div>
+      <textarea class="annot-text-input" oninput="onAnnotationTextInput('${it.id}', this.value)" placeholder="Écrire un commentaire…">${_annotHtmlEscape(it.text)}</textarea>
+      <button class="annot-delete-btn" onclick="deleteAnnotation('${it.id}')" title="Supprimer le commentaire">×</button>
+    </div>`).join('');
+}
+
+function _focusAnnotationInput(id) {
+  const section = document.getElementById('annotations-section');
+  if (section) section.classList.remove('collapsed');
+  setTimeout(() => {
+    const item = document.querySelector(`.annot-item[data-annot-id="${id}"]`);
+    if (!item) return;
+    item.scrollIntoView({ block: 'nearest' });
+    const ta = item.querySelector('.annot-text-input');
+    if (ta) ta.focus();
+  }, 0);
+}
+
+function onAnnotationTextInput(id, value) {
+  const tab = getActiveTab();
+  if (!tab) return;
+  const RE = new RegExp(`(comment-id="${id}" comment-text=")((?:\\\\.|[^"\\\\])*)(")`);
+  const newContent = tab.content.replace(RE, (_m, p1, _old, p3) => p1 + _annotEscape(value) + p3);
+  if (newContent === tab.content) return;
+  tab.content  = newContent;
+  tab.modified = (tab.content !== tab.savedContent);
+  renderTabList();
+  if (state.sourceMode) {
+    const ta = document.getElementById('source-editor');
+    if (ta) { ta.value = tab.content; _updateSourceHighlight(); }
+  } else {
+    const span = document.querySelector(`#preview .md-annotation[data-annot-id="${id}"]`);
+    if (span) span.setAttribute('data-annot-text', value);
+  }
+}
+
+function deleteAnnotation(id) {
+  const tab = getActiveTab();
+  if (!tab) return;
+  if (!state.sourceMode) {
+    const span = document.querySelector(`#preview .md-annotation[data-annot-id="${id}"]`);
+    if (span) {
+      const parent = span.parentNode;
+      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      parent.removeChild(span);
+      parent.normalize();
+    }
+    syncPreviewToContent();
+  } else {
+    const RE = new RegExp(`\\[((?:[^\\[\\]]|\\[[^\\]]*\\])*)\\]\\{\\.comment comment-id="${id}" comment-text="(?:\\\\.|[^"\\\\])*"\\}`);
+    const newContent = tab.content.replace(RE, '$1');
+    if (newContent === tab.content) return;
+    tab.content  = newContent;
+    tab.modified = (tab.content !== tab.savedContent);
+    renderTabList();
+    const ta = document.getElementById('source-editor');
+    if (ta) { ta.value = tab.content; _updateSourceHighlight(); }
+  }
+  updateAnnotationsList();
+}
+
+function selectAnnotationAnchor(id) {
+  const tab = getActiveTab();
+  if (!tab) return;
+  if (state.sourceMode) {
+    const ta   = document.getElementById('source-editor');
+    const pane = document.getElementById('source-scroll');
+    if (!ta) return;
+    const RE = new RegExp(`\\[((?:[^\\[\\]]|\\[[^\\]]*\\])*)\\]\\{\\.comment comment-id="${id}" comment-text="(?:\\\\.|[^"\\\\])*"\\}`);
+    const m = RE.exec(tab.content);
+    if (!m) return;
+    ta.setSelectionRange(m.index, m.index + m[0].length);
+    ta.focus();
+    if (pane) {
+      const cs          = getComputedStyle(ta);
+      const paddingTop  = parseFloat(cs.paddingTop) || 24;
+      const lineHeight  = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) * 1.6);
+      const linesBefore = ta.value.substring(0, m.index).split('\n').length - 1;
+      const targetScrollTop = Math.max(0, paddingTop + linesBefore * lineHeight - pane.clientHeight / 2 + lineHeight / 2);
+      setTimeout(() => { pane.scrollTop = targetScrollTop; }, 0);
+    }
+  } else {
+    const preview = document.getElementById('preview');
+    const span = preview.querySelector(`.md-annotation[data-annot-id="${id}"]`);
+    if (!span) return;
+    span.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    preview.focus();
+    span.classList.add('md-annotation--flash');
+    setTimeout(() => span.classList.remove('md-annotation--flash'), 900);
+  }
+}
+
+function toggleAnnotationsSection() {
+  const section = document.getElementById('annotations-section');
+  if (!section) return;
+  const collapsed = section.classList.toggle('collapsed');
+  const handle = document.getElementById('meta-annot-resize-handle');
+  if (handle) handle.classList.toggle('disabled', collapsed);
+}
+
 async function _todoOpenFile(path) {
   if (!path) return;
   // Si l'onglet est déjà ouvert, on bascule simplement dessus
@@ -7406,6 +7704,43 @@ function applyTextColor(color) {
     range.insertNode(span);
     sel.removeAllRanges();
     syncPreviewToContent();
+  }
+}
+
+// ── Ajout d'un commentaire (annotation) sur la sélection courante ──────────────
+function addAnnotation() {
+  if (state.sourceMode) {
+    const ta    = document.getElementById('source-editor');
+    const start = ta.selectionStart;
+    const end   = ta.selectionEnd;
+    const sel   = ta.value.substring(start, end);
+    if (!sel) return;
+    const id      = _newAnnotId();
+    const wrapped = `[${sel}]{.comment comment-id="${id}" comment-text=""}`;
+    ta.value = ta.value.substring(0, start) + wrapped + ta.value.substring(end);
+    ta.selectionStart = start;
+    ta.selectionEnd   = start + wrapped.length;
+    ta.focus();
+    onSourceInput();
+    updateAnnotationsList();
+    _focusAnnotationInput(id);
+  } else {
+    const preview = document.getElementById('preview');
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    if (!preview.contains(sel.anchorNode)) return;
+    const range = sel.getRangeAt(0);
+    const span  = document.createElement('span');
+    span.className = 'md-annotation';
+    const id = _newAnnotId();
+    span.setAttribute('data-annot-id', id);
+    span.setAttribute('data-annot-text', '');
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    sel.removeAllRanges();
+    syncPreviewToContent();
+    updateAnnotationsList();
+    _focusAnnotationInput(id);
   }
 }
 
@@ -10946,6 +11281,70 @@ function deleteImage() {
   syncPreviewToContent();
 }
 
+// Recharge l'image depuis le disque (contourne le cache du navigateur) : utile
+// quand le fichier a été modifié en dehors de l'éditeur (ex. régénéré par un
+// autre outil) sans que son chemin ait changé.
+function refreshImage() {
+  if (!_imageContextFigure) return;
+  const img = _imageContextFigure.querySelector('img');
+  const src = _imageContextFigure.getAttribute('data-src') || '';
+  if (!img || !src) return;
+  img.src = _pathToUrl(src) + '?t=' + Date.now();
+}
+
+// Convertit un blob image (png/jpg/gif/webp/svg…) en PNG via un <canvas>, en passant
+// par une URL blob: (même origine, donc pas de canvas « tainted ») plutôt que file:/http:.
+function _rasterizeToPng(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      canvas.toBlob(pngBlob => {
+        URL.revokeObjectURL(url);
+        pngBlob ? resolve(pngBlob) : reject(new Error('toBlob a échoué'));
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Chargement de l'image échoué")); };
+    img.src = url;
+  });
+}
+
+// Copie l'image (fichier local ou distant) dans le presse-papiers système, au format
+// PNG (seul format universellement supporté par l'API Clipboard). Les images locales
+// sont lues via l'API Python (et non fetch()/canvas sur une URL file:, non fiable
+// selon le moteur webview) puis converties en PNG côté JS.
+async function copyImage() {
+  if (!_imageContextFigure) return;
+  const rawSrc = _imageContextFigure.getAttribute('data-src') || '';
+  if (!rawSrc) return;
+
+  try {
+    let blob;
+    if (/^https?:\/\//i.test(rawSrc)) {
+      const resp = await fetch(rawSrc);
+      blob = await resp.blob();
+    } else {
+      if (!window.pywebview || !window.pywebview.api) throw new Error('API indisponible');
+      const fileUrl = _pathToUrl(rawSrc);
+      const absPath = decodeURIComponent(fileUrl.replace(/^file:\/\/\//, ''));
+      const result  = await window.pywebview.api.read_image_base64(absPath);
+      if (!result || result.error) throw new Error(result && result.error);
+      const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
+      blob = new Blob([bytes], { type: result.mime || 'application/octet-stream' });
+    }
+    const pngBlob = await _rasterizeToPng(blob);
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+    showToast('Image copiée dans le presse-papiers');
+  } catch (e) {
+    console.error('copyImage:', e);
+    showToast("Impossible de copier l'image");
+  }
+}
+
 // ── Redimensionnement colonnes tableau par glisser-déposer ────────────────────
 // `widths` : pourcentages relatifs à la largeur de la TABLE (somme = 100).
 // La largeur de la table par rapport au conteneur (#preview) n'est PAS modifiée
@@ -11614,6 +12013,7 @@ function setupKeyboardShortcuts() {
     if (ctrl && e.key === 'f') { e.preventDefault(); openSearch(); }
     if (ctrl && e.altKey && e.key === 'ArrowLeft')  { e.preventDefault(); toggleSidebar(); }
     if (ctrl && e.altKey && e.key === 'ArrowRight') { e.preventDefault(); toggleTOC(); }
+    if (ctrl && e.altKey && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); addAnnotation(); }
     if (ctrl && !e.shiftKey && e.key === 'Enter') { e.preventDefault(); applyPagebreak(); }
     if (ctrl && e.shiftKey && e.key === 'Enter') { e.preventDefault(); insertEmptyParaAbove(); }
     if (ctrl && e.shiftKey && e.key === 'R') { e.preventDefault(); applyHorizontalRule(); }
@@ -12226,6 +12626,8 @@ window.selectImageAlign       = selectImageAlign;
 window.selectImageVisibility  = selectImageVisibility;
 window.confirmImageDialog   = confirmImageDialog;
 window.deleteImage          = deleteImage;
+window.refreshImage         = refreshImage;
+window.copyImage            = copyImage;
 window.changeImageFile      = changeImageFile;
 window.copyImagePath        = copyImagePath;
 window.insertCaptionLink    = insertCaptionLink;
@@ -12325,5 +12727,10 @@ window.onMetaFieldChange     = onMetaFieldChange;
 window.toggleMetadataSection = toggleMetadataSection;
 window.toggleMetadataOther   = toggleMetadataOther;
 window.toggleTocSection      = toggleTocSection;
+window.addAnnotation           = addAnnotation;
+window.selectAnnotationAnchor  = selectAnnotationAnchor;
+window.onAnnotationTextInput   = onAnnotationTextInput;
+window.deleteAnnotation        = deleteAnnotation;
+window.toggleAnnotationsSection= toggleAnnotationsSection;
 window._applyContentMaxWidth = _applyContentMaxWidth;
 Object.defineProperty(window, '_contentMaxWidth', { get: () => _contentMaxWidth });

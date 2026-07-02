@@ -927,6 +927,23 @@ class FileAPI:
         except Exception as e:
             return {'error': str(e)}
 
+    def read_image_base64(self, path):
+        """Lit un fichier image sur le disque et le renvoie encodé en base64.
+        Utilisé pour copier une image dans le presse-papiers depuis le JS,
+        car fetch()/canvas sur une URL file:// n'est pas fiable selon le
+        moteur webview (restrictions cross-origin variables)."""
+        import base64 as _b64
+        import mimetypes
+        try:
+            if not os.path.isfile(path):
+                return {'error': 'Fichier introuvable'}
+            mime, _ = mimetypes.guess_type(path)
+            with open(path, 'rb') as f:
+                data = f.read()
+            return {'data': _b64.b64encode(data).decode('ascii'), 'mime': mime or 'application/octet-stream'}
+        except Exception as e:
+            return {'error': str(e)}
+
     def quit(self):
         webview.windows[0].destroy()
 

@@ -566,6 +566,19 @@
             </div>
           </div>
         </div>
+
+        <div id="meta-annot-resize-handle" title="Redimensionner"></div>
+        <!-- Section Commentaires (annotations liées à une sélection de texte) -->
+        <div id="annotations-section">
+          <div id="annotations-header" onclick="toggleAnnotationsSection()">
+            <svg class="metadata-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span>Commentaires</span>
+            <span id="annotations-counter" class="annotations-counter"></span>
+          </div>
+          <div id="annotations-body"></div>
+        </div>
       </div>
 
     </div>
@@ -1844,6 +1857,21 @@
       </svg>
       Propriétés…
     </button>
+    <button class="ctx-item" onclick="refreshImage(); hideImageContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Actualiser l'image
+    </button>
+    <button class="ctx-item" onclick="copyImage(); hideImageContextMenu()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copier l'image
+    </button>
     <div class="ctx-separator"></div>
     <button class="ctx-item ctx-danger" onclick="deleteImage(); hideImageContextMenu()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2133,6 +2161,12 @@
             <polyline points="8 6 2 12 8 18"/>
           </svg>
           Code inline <span class="ctx-shortcut">Ctrl+E</span>
+        </button>
+        <button class="ctx-item" onmousedown="event.preventDefault()" onclick="addAnnotation(); hideContextMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Ajouter un commentaire <span class="ctx-shortcut">Ctrl+Alt+M</span>
         </button>
 
         <div class="ctx-group-title">Mise en forme</div>
@@ -2773,6 +2807,17 @@
       <span class="fn-tooltip-label">Note de bas de page</span>
     </div>
     <div class="fn-tooltip-body" id="fn-tooltip-body"></div>
+  </div>
+
+  <!-- Popover survol commentaire (annotation liée à une sélection) -->
+  <div id="annot-tooltip">
+    <div class="fn-tooltip-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="fn-tooltip-label">Commentaire</span>
+    </div>
+    <div class="fn-tooltip-body" id="annot-tooltip-body"></div>
   </div>
 
   <div id="toast"></div>

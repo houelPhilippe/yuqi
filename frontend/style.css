@@ -1478,6 +1478,21 @@ body.log-mode #menu-compile-section { display: none; }
 #toc-panel.collapsed #toc-meta-resize-handle { display: none; }
 #toc-section.collapsed ~ #toc-meta-resize-handle { display: none; }
 
+/* Poignée de redimensionnement entre « Métadonnées » et « Commentaires » */
+#meta-annot-resize-handle {
+  height: 4px;
+  min-height: 4px;
+  flex-shrink: 0;
+  cursor: row-resize;
+  transition: background 0.15s;
+  background: transparent;
+}
+#meta-annot-resize-handle:hover { background: var(--accent); opacity: 0.4; }
+#meta-annot-resize-handle.dragging { background: var(--accent); opacity: 0.6; }
+#meta-annot-resize-handle.disabled { cursor: default; pointer-events: none; }
+#toc-panel.collapsed #meta-annot-resize-handle { display: none; }
+#metadata-section.collapsed ~ #meta-annot-resize-handle { display: none; }
+
 /* Section Sommaire : conteneur accordéon (en-tête + corps) */
 #toc-section {
   display: flex;
@@ -1673,6 +1688,145 @@ body.log-mode #menu-compile-section { display: none; }
   color: var(--text-muted);
   padding: 10px 12px;
   font-style: italic;
+}
+
+/* ── Panneau Commentaires (annotations liées à une sélection) ────────────── */
+#toc-panel.collapsed #annotations-section { display: none; }
+
+#annotations-section {
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  height: 220px;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#annotations-section.collapsed {
+  height: auto !important;
+  flex: 0 0 auto;
+}
+
+#annotations-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+#annotations-header:hover { color: var(--text); }
+#annotations-header span:not(.annotations-counter) { flex: 1; }
+#annotations-section.collapsed #annotations-header .metadata-toggle-icon { transform: rotate(-90deg); }
+#annotations-section.collapsed #annotations-body { display: none; }
+
+.annotations-counter {
+  background: var(--bg3);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#annotations-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#annotations-body::-webkit-scrollbar { width: 4px; }
+#annotations-body::-webkit-scrollbar-track { background: transparent; }
+#annotations-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.annot-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 8px 4px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.annot-item {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-left: 3px solid rgba(255, 196, 0, 0.6);
+  border-radius: 0 6px 6px 0;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.annot-anchor {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.35;
+  cursor: pointer;
+  max-height: 3.6em;
+  overflow: hidden;
+}
+.annot-anchor:hover { color: var(--accent); }
+
+.annot-text-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 5px 7px;
+  resize: vertical;
+  min-height: 40px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.annot-text-input:focus { border-color: var(--accent); }
+
+.annot-delete-btn {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.annot-delete-btn:hover { color: #e05555; background: var(--bg3); }
+.annot-item--flash {
+  border-left-color: rgba(255, 196, 0, 1);
+  background: rgba(255, 196, 0, 0.12);
+  transition: background 0.4s, border-color 0.4s;
+}
+
+/* ── Rendu de l'ancre de commentaire dans le preview ──────────────────────── */
+.md-annotation {
+  background: rgba(255, 196, 0, 0.16);
+  border-bottom: 2px solid rgba(255, 196, 0, 0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.4s, border-color 0.4s;
+}
+.md-annotation:hover {
+  background: rgba(255, 196, 0, 0.28);
+}
+.md-annotation--flash {
+  background: rgba(255, 196, 0, 0.55);
+  border-color: rgba(255, 196, 0, 1);
 }
 
 .toc-item {
@@ -4196,8 +4350,8 @@ div.md-html-literal.md-br-tag {
   border-radius: 12px;
   width: 860px;
   max-width: 96vw;
-  height: 660px;
-  max-height: 88vh;
+  height: 820px;
+  max-height: 92vh;
   box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   overflow: hidden;
   display: flex;
@@ -4315,7 +4469,7 @@ div.md-html-literal.md-br-tag {
 
 .settings-body-2col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   align-items: start;
   gap: 16px;
   padding: 20px;
@@ -5420,6 +5574,36 @@ div.md-html-literal.md-br-tag {
 .fn-tooltip-body ul,
 .fn-tooltip-body ol { margin: 4px 0 0 16px; padding: 0; }
 .fn-tooltip-body li { margin-bottom: 2px; }
+
+/* Popover survol commentaire (annotation liée à une sélection) */
+#annot-tooltip {
+  position: fixed;
+  z-index: 9500;
+  max-width: 320px;
+  min-width: 140px;
+  background: var(--bg2);
+  border: 1px solid rgba(255, 196, 0, 0.6);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  padding: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  overflow: hidden;
+}
+#annot-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+#annot-tooltip .fn-tooltip-header { color: rgba(255, 196, 0, 0.9); }
+#annot-tooltip-body {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
 
 .footnote-def {
   font-size: 0.85em;
